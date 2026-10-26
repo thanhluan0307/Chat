@@ -4,6 +4,7 @@ import App from '../App';
 import { httpClient } from '../src/api/http';
 import { navigationRef } from '../src/navigation/navigationRef';
 import { RouteName } from '../src/navigation/routes';
+import { readSession } from '../src/storage/sessionStorage';
 
 const apiMock = new MockAdapter(httpClient, { onNoMatch: 'throwException' });
 const user = {
@@ -14,9 +15,10 @@ const user = {
 };
 
 function allowLogin() {
-  apiMock
-    .onPost('/auth/signin')
-    .replyOnce(200, { accessToken: 'test-access-token' });
+  apiMock.onPost('/auth/signin').replyOnce(200, {
+    accessToken: 'test-access-token',
+    refreshToken: 'test-refresh-token',
+  });
   apiMock.onGet('/users/me').replyOnce(200, { user });
   apiMock.onGet('/users').reply(200, {
     users: [{ _id: 'friend-1', displayName: 'Linh Nguyễn', username: 'linh' }],
@@ -87,14 +89,19 @@ test('a rejected password stays on login and displays the server error', async (
   expect(apiMock.history.post).toHaveLength(1);
   expect(apiMock.history.post[0]).toMatchObject({
     url: '/auth/signin',
-    data: JSON.stringify({ username: 'luan', password: 'password-for-test' }),
+    data: JSON.stringify({
+      username: 'luan',
+      password: 'password-for-test',
+      client: 'mobile',
+    }),
   });
 });
 
 test('sign-in cannot open the tabs if the token fails the profile check', async () => {
-  apiMock
-    .onPost('/auth/signin')
-    .replyOnce(200, { accessToken: 'unverified-test-token' });
+  apiMock.onPost('/auth/signin').replyOnce(200, {
+    accessToken: 'unverified-test-token',
+    refreshToken: 'test-refresh-token',
+  });
   apiMock
     .onGet('/users/me')
     .replyOnce(403, { message: 'Phiên đăng nhập không hợp lệ.' });
@@ -125,6 +132,11 @@ test('verified login opens tabs, preserves selected tabs, and manages drafts wit
   await render(<App />);
   await submitLogin();
   await screen.findByTestId('tab-chats');
+  expect(await readSession()).toEqual({
+    accessToken: 'test-access-token',
+    refreshToken: 'test-refresh-token',
+    user,
+  });
   expect(apiMock.history.get[0]).toMatchObject({
     url: '/users/me',
     headers: expect.objectContaining({
@@ -177,8 +189,9 @@ test('sign-out clears the authenticated session, request token, and navigation h
   expect(apiMock.history.post[1]).toMatchObject({
     url: '/auth/signout',
     withCredentials: true,
-    headers: expect.objectContaining({
-      Authorization: 'Bearer test-access-token',
+    data: JSON.stringify({
+      client: 'mobile',
+      refreshToken: 'test-refresh-token',
     }),
   });
   await httpClient.get('/auth-header-check');

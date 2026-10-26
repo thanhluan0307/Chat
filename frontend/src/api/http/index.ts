@@ -1,2 +1,6 @@
-export { httpClient, registerAccessTokenProvider } from './client';
+export {
+  httpClient,
+  registerAccessTokenProvider,
+  registerSessionRefresh,
+} from './client';
 export { ApiError } from './errors';

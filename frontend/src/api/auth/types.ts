@@ -11,8 +11,8 @@ export interface SignUpRequest extends SignInRequest {
 }
 export interface SignInResponse {
   accessToken: string;
+  refreshToken: string;
 }
-export interface AuthSession {
-  accessToken: string;
+export interface AuthSession extends SignInResponse {
   user: UserProfile;
 }

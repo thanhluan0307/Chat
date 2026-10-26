@@ -1,4 +1,4 @@
-export { signIn, signUp, signOut } from './api';
+export { signIn, signUp, signOut, refreshSession } from './api';
 export type {
   SignInRequest,
   SignUpRequest,

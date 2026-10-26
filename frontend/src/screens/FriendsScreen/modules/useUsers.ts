@@ -1,12 +1,14 @@
 import { useFocusEffect } from '@react-navigation/native';
 import axios from 'axios';
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { getUsers } from '../../../api/users';
 import type { UserSummary, UsersPagination } from '../../../api/users';
 import { ApiError } from '../../../api/http';
 
 interface UsersState {
+  search: string;
+  query: string;
   users: UserSummary[];
   pagination: UsersPagination | null;
   status: 'loading' | 'success' | 'error';
@@ -21,6 +23,8 @@ type LoadMode = 'initial' | 'refresh' | 'more';
 export function useUsers() {
   const { control, getValues, setValue } = useForm<UsersState>({
     defaultValues: {
+      search: '',
+      query: '',
       users: [],
       pagination: null,
       status: 'loading',
@@ -43,6 +47,13 @@ export function useUsers() {
         'moreError',
       ] as const,
     });
+  const search = useWatch({ control, name: 'search' });
+  const query = useWatch({ control, name: 'query' });
+  useEffect(() => {
+    if (search.trim() === query) return;
+    const timer = setTimeout(() => setValue('query', search.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [search, query, setValue]);
   const currentRequest = useRef<AbortController | null>(null);
   const load = useCallback(
     async (page: number, mode: LoadMode) => {
@@ -58,7 +69,10 @@ export function useUsers() {
       if (mode === 'initial' || getValues('users').length === 0)
         setValue('status', 'loading');
       try {
-        const result = await getUsers({ page, limit: 20 }, controller.signal);
+        const result = await getUsers(
+          { page, limit: 20, search: query },
+          controller.signal,
+        );
         if (controller.signal.aborted || currentRequest.current !== controller)
           return;
         const previous = mode === 'more' ? getValues('users') : [];
@@ -91,18 +105,18 @@ export function useUsers() {
         }
       }
     },
-    [getValues, setValue],
+    [getValues, setValue, query],
   );
 
   useFocusEffect(
     useCallback(() => {
       // Refresh page one on focus; cancel any page request on blur or unmount.
-      load(1, getValues('users').length > 0 ? 'refresh' : 'initial');
+      load(1, 'initial');
       return () => {
         currentRequest.current?.abort();
         currentRequest.current = null;
       };
-    }, [getValues, load]),
+    }, [load]),
   );
 
   const refresh = useCallback(() => {
@@ -113,14 +127,24 @@ export function useUsers() {
   }, [load]);
   const loadMore = useCallback(() => {
     const currentPagination = getValues('pagination');
-    if (currentPagination?.hasNextPage && !currentRequest.current)
+    if (
+      getValues('search').trim() === query &&
+      currentPagination?.hasNextPage &&
+      !currentRequest.current
+    )
       load(currentPagination.page + 1, 'more');
-  }, [getValues, load]);
+  }, [getValues, load, query]);
 
   return {
+    control,
+    search,
+    submitSearch: () => setValue('query', getValues('search').trim()),
+    changeSearch: (value: string) => {
+      setValue('search', value);
+    },
     users,
     pagination,
-    status,
+    status: search.trim() !== query ? 'loading' : status,
     refreshing,
     loadingMore,
     error,

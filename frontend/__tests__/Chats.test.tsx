@@ -50,7 +50,10 @@ beforeEach(() => {
   apiMock.reset();
   apiMock
     .onPost('/auth/signin')
-    .replyOnce(200, { accessToken: 'test-access-token' });
+    .replyOnce(200, {
+      accessToken: 'test-access-token',
+      refreshToken: 'test-refresh-token',
+    });
   apiMock.onGet('/users/me').replyOnce(200, { user });
   apiMock.onGet('/users').reply(200, {
     users: [],

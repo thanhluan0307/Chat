@@ -10,6 +10,10 @@ function parsePositiveInteger(value, fallback) {
 
 /** Return a paginated public directory of other users for the authenticated client. */
 export const getUsers = async (req, res) => {
+  const search = req.query.search;
+  if (search !== undefined && (typeof search !== "string" || search.length > 100)) {
+    return res.status(400).json({ message: "search phải là chuỗi tối đa 100 ký tự." });
+  }
   const page = parsePositiveInteger(req.query.page, 1);
   const limit = parsePositiveInteger(req.query.limit, 20);
   if (
@@ -27,6 +31,13 @@ export const getUsers = async (req, res) => {
   }
   try {
     const filter = { _id: { $ne: req.user._id } };
+    if (search?.trim()) {
+      const pattern = search.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      filter.$or = [
+        { displayName: { $regex: pattern, $options: "i" } },
+        { username: { $regex: pattern, $options: "i" } },
+      ];
+    }
     const [users, total] = await Promise.all([
       User.find(filter)
         .select("_id displayName username avatarUrl")

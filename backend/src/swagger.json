@@ -25,6 +25,11 @@
         ],
         "parameters": [
           {
+            "in": "query", "name": "search",
+            "description": "Tìm một phần tên hoặc username, không phân biệt hoa thường, trước phân trang.",
+            "schema": { "type": "string", "maxLength": 100 }
+          },
+          {
             "in": "query",
             "name": "page",
             "schema": {
@@ -123,7 +128,7 @@
     "/auth/signin": {
       "post": {
         "summary": "SignIn",
-        "description": "Log in với username và password. Trả về access token trong res và refresh token trong cookie.",
+        "description": "Log in với username và password. Browser dùng refresh cookie HttpOnly. Gửi client=mobile để nhận refreshToken trong JSON thay cho cookie.",
         "tags": ["Authentication"],
         "responses": {
           "200": {
@@ -133,6 +138,7 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                  "client": { "type": "string", "enum": ["mobile"], "description": "Chỉ truyền cho native app" },
                     "message": {
                       "type": "string",
                       "example": "User Hai User đã logged in!"
@@ -175,9 +181,11 @@
     "/auth/signout": {
       "post": {
         "summary": "SignOut",
+        "description": "Mobile gửi JSON client=mobile và refreshToken; browser dùng cookie. Thu hồi phiên, trả 204.",
+        "requestBody": { "$ref": "#/components/requestBodies/RefreshCredentials" },
         "tags": ["Authentication"],
         "responses": {
-          "200": { "description": "Success" },
+          "204": { "description": "Session revoked" },
           "500": { "description": "Internal server error" }
         }
       }
@@ -185,8 +193,10 @@
     "/auth/refresh": {
       "post": {
         "summary": "RefreshToken",
+        "description": "Mobile gửi JSON client=mobile và refreshToken; browser dùng cookie. Trả accessToken mới.",
+        "requestBody": { "$ref": "#/components/requestBodies/RefreshCredentials" },
         "tags": ["Authentication"],
-        "responses": {}
+        "responses": { "200": { "description": "Access token mới" }, "401": { "description": "Thiếu token" }, "403": { "description": "Phiên không hợp lệ hoặc hết hạn" } }
       }
     },
     "/users/me": {
@@ -347,6 +357,15 @@
     }
   },
   "components": {
+    "requestBodies": {
+      "RefreshCredentials": {
+        "required": false,
+        "content": { "application/json": { "schema": {
+          "type": "object", "required": ["client", "refreshToken"],
+          "properties": { "client": { "type": "string", "enum": ["mobile"] }, "refreshToken": { "type": "string", "maxLength": 512 } }
+        } } }
+      }
+    },
     "securitySchemes": {
       "bearerAuth": {
         "type": "http",

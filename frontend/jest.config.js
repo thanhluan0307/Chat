@@ -7,6 +7,6 @@ module.exports = {
       '<rootDir>/node_modules/lucide-react-native/dist/cjs/icons/$1.js',
   },
   transformIgnorePatterns: [
-    'node_modules/(?!((jest-)?react-native|@react-native(-community)?|@react-navigation|react-native-screens|react-native-safe-area-context|react-native-svg|lucide-react-native|react-freeze|axios)/)',
+    'node_modules/(?!((jest-)?react-native|@react-native(-community)?|@react-navigation|react-native-mmkv|react-native-screens|react-native-safe-area-context|react-native-svg|lucide-react-native|react-freeze|axios)/)',
   ],
 };

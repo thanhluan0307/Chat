@@ -1,10 +1,13 @@
 import { useTheme } from '@react-navigation/native';
 import { useCallback } from 'react';
+import { Controller } from 'react-hook-form';
+import { Search } from '../../components/icons';
 import {
   ActivityIndicator,
   FlatList,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import type { ListRenderItem } from 'react-native';
@@ -18,6 +21,10 @@ import { useUsers } from './modules/useUsers';
 export function FriendsScreen() {
   const { colors } = useTheme();
   const {
+    control,
+    search,
+    changeSearch,
+    submitSearch,
     users,
     pagination,
     status,
@@ -66,9 +73,40 @@ export function FriendsScreen() {
         <Text style={[styles.title, { color: colors.text }]}>Mọi người</Text>
         <Text style={[styles.subtitle, { color: colors.text }]}>
           {pagination
-            ? `${pagination.total} người dùng trong ChatApp`
+            ? `${pagination.total} ${
+                search.trim() ? 'kết quả tìm kiếm' : 'người dùng trong ChatApp'
+              }`
             : 'Kết nối với mọi người trong ChatApp.'}
         </Text>
+        <View
+          style={[
+            styles.search,
+            { backgroundColor: colors.card, borderColor: colors.border },
+          ]}
+        >
+          <Search size={20} color={colors.text} />
+          <Controller
+            control={control}
+            name="search"
+            render={({ field: { value, onBlur } }) => (
+              <TextInput
+                accessibilityLabel="Tìm bạn"
+                placeholder="Tìm theo tên hoặc username"
+                placeholderTextColor={colors.text + '80'}
+                value={value}
+                onChangeText={changeSearch}
+                onBlur={onBlur}
+                onSubmitEditing={submitSearch}
+                maxLength={100}
+                autoCapitalize="none"
+                autoCorrect={false}
+                returnKeyType="search"
+                clearButtonMode="while-editing"
+                style={[styles.searchInput, { color: colors.text }]}
+              />
+            )}
+          />
+        </View>
       </View>
       {status === 'loading' ? (
         <UsersStateView kind="loading" />
@@ -81,10 +119,14 @@ export function FriendsScreen() {
           keyExtractor={item => item._id}
           renderItem={renderItem}
           contentContainerStyle={styles.list}
-          ListEmptyComponent={<UsersStateView kind="empty" />}
+          ListEmptyComponent={
+            <UsersStateView kind="empty" searching={!!search.trim()} />
+          }
           ListFooterComponent={footer}
           refreshing={refreshing}
           onRefresh={refresh}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           alwaysBounceVertical
           onEndReached={() => {
             if (!moreError) loadMore();
@@ -97,6 +139,15 @@ export function FriendsScreen() {
 }
 const styles = StyleSheet.create({
   heading: { padding: 24, gap: 10 },
+  search: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+  },
+  searchInput: { flex: 1, minHeight: 46, fontSize: 15 },
   title: { fontSize: 28, fontWeight: '700', letterSpacing: -0.7 },
   subtitle: { fontSize: 14, opacity: 0.6 },
   list: { flexGrow: 1, paddingHorizontal: 20, paddingBottom: 24 },

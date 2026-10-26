@@ -45,9 +45,10 @@ function requestedPages() {
 
 beforeEach(() => {
   apiMock.reset();
-  apiMock
-    .onPost('/auth/signin')
-    .replyOnce(200, { accessToken: 'test-access-token' });
+  apiMock.onPost('/auth/signin').replyOnce(200, {
+    accessToken: 'test-access-token',
+    refreshToken: 'test-refresh-token',
+  });
   apiMock.onGet('/users/me').replyOnce(200, { user });
   apiMock.onGet('/conversations').reply(200, { conversations: [] });
 });
@@ -176,4 +177,75 @@ test('invalid pagination is shown as a failure instead of an empty directory', a
     await screen.findByText('Không tải được người dùng'),
   ).toBeOnTheScreen();
   expect(screen.queryByText('Chưa có người dùng khác')).toBeNull();
+});
+
+test('search is debounced, resets pagination and preserves its query when loading more', async () => {
+  apiMock
+    .onGet('/users')
+    .reply(config => [
+      200,
+      config.params.search
+        ? page(
+            config.params.page === 1 ? [minh] : [linh],
+            config.params.page,
+            21,
+          )
+        : page([linh]),
+    ]);
+  await openUsers();
+  await screen.findByText('Linh Nguyễn');
+  const before = requestedPages().length;
+  await fireEvent.changeText(screen.getByLabelText('Tìm bạn'), 'Mi');
+  await fireEvent.changeText(screen.getByLabelText('Tìm bạn'), '  Minh  ');
+  expect(requestedPages()).toHaveLength(before);
+  await screen.findByText('Minh Anh');
+  const searches = () =>
+    apiMock.history.get.filter(
+      item => item.url === '/users' && item.params.search,
+    );
+  expect(searches()).toHaveLength(1);
+  expect(searches()[0].params).toEqual({ page: 1, limit: 20, search: 'Minh' });
+  await fireEvent.press(screen.getByRole('button', { name: 'Tải thêm' }));
+  await screen.findByText('Linh Nguyễn');
+  expect(searches()[1].params).toEqual({ page: 2, limit: 20, search: 'Minh' });
+  await fireEvent.changeText(screen.getByLabelText('Tìm bạn'), '');
+  await screen.findByText('Đã hiển thị tất cả người dùng');
+  expect(
+    apiMock.history.get.filter(item => item.url === '/users').at(-1)?.params,
+  ).toEqual({ page: 1, limit: 20 });
+});
+
+test('search with no matches shows its own empty state', async () => {
+  apiMock
+    .onGet('/users')
+    .reply(config => [200, page(config.params.search ? [] : [linh])]);
+  await openUsers();
+  await screen.findByText('Linh Nguyễn');
+  await fireEvent.changeText(screen.getByLabelText('Tìm bạn'), 'nobody');
+  expect(
+    await screen.findByText('Không tìm thấy người dùng'),
+  ).toBeOnTheScreen();
+  expect(screen.queryByText('Chưa có người dùng khác')).toBeNull();
+});
+
+test('a delayed older search cannot replace the latest results', async () => {
+  let finish: (() => void) | undefined;
+  apiMock.onGet('/users').reply(config => {
+    if (config.params.search === 'linh')
+      return new Promise<[number, object]>(resolve => {
+        finish = () => resolve([200, page([linh])]);
+      });
+    return [200, page(config.params.search ? [minh] : [linh])];
+  });
+  await openUsers();
+  await screen.findByText('Linh Nguyễn');
+  await fireEvent.changeText(screen.getByLabelText('Tìm bạn'), 'linh');
+  await act(async () => {
+    await new Promise<void>(resolve => setTimeout(resolve, 350));
+  });
+  expect(finish).toBeDefined();
+  await fireEvent.changeText(screen.getByLabelText('Tìm bạn'), 'minh');
+  await screen.findByText('Minh Anh');
+  await act(() => finish?.());
+  expect(screen.queryByText('Linh Nguyễn')).toBeNull();
 });

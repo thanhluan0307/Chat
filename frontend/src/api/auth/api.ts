@@ -10,20 +10,24 @@ export async function signIn({
   const { data } = await httpClient.post<unknown>(API_ENDPOINTS.auth.signIn, {
     username,
     password,
+    client: 'mobile',
   });
   if (
     !data ||
     typeof data !== 'object' ||
     !('accessToken' in data) ||
     typeof data.accessToken !== 'string' ||
-    !data.accessToken.trim()
+    !data.accessToken.trim() ||
+    !('refreshToken' in data) ||
+    typeof data.refreshToken !== 'string' ||
+    !data.refreshToken.trim()
   ) {
     throw new ApiError(
       'Không thể xác nhận phiên đăng nhập. Vui lòng thử lại.',
       0,
     );
   }
-  return { accessToken: data.accessToken };
+  return { accessToken: data.accessToken, refreshToken: data.refreshToken };
 }
 
 /** Create an account without forwarding confirmation fields or starting a session. */
@@ -43,7 +47,26 @@ export async function signUp({
   });
 }
 
-/** Request server sign-out using the refresh cookie issued by the backend. */
-export async function signOut(): Promise<void> {
-  await httpClient.post<void>(API_ENDPOINTS.auth.signOut);
+/** Revoke the persisted native session on the server. */
+export async function signOut(refreshToken: string): Promise<void> {
+  await httpClient.post<void>(API_ENDPOINTS.auth.signOut, {
+    client: 'mobile',
+    refreshToken,
+  });
+}
+
+export async function refreshSession(refreshToken: string): Promise<string> {
+  const { data } = await httpClient.post<unknown>(API_ENDPOINTS.auth.refresh, {
+    client: 'mobile',
+    refreshToken,
+  });
+  if (
+    !data ||
+    typeof data !== 'object' ||
+    !('accessToken' in data) ||
+    typeof data.accessToken !== 'string' ||
+    !data.accessToken.trim()
+  )
+    throw new ApiError('Không thể làm mới phiên đăng nhập.', 0);
+  return data.accessToken;
 }

@@ -20,6 +20,7 @@ export interface UsersPagination {
   hasPreviousPage: boolean;
 }
 export interface GetUsersParams {
+  search?: string;
   page?: number;
   limit?: number;
 }

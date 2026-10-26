@@ -1,3 +1,6 @@
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { useTheme } from '@react-navigation/native';
+import { AppButton } from '../components/AppButton';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { conversations } from '../data/conversations';
 import { useSession } from '../providers/SessionProvider';
@@ -10,7 +13,27 @@ import type { RootStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 export function RootNavigator() {
-  const { session } = useSession();
+  const { colors } = useTheme();
+  const { session, isRestoring, restoreError, restore } = useSession();
+  if (isRestoring || restoreError)
+    return (
+      <View style={styles.loading}>
+        {restoreError ? (
+          <>
+            <Text accessibilityRole="alert" style={{ color: colors.text }}>
+              {restoreError}
+            </Text>
+            <AppButton title="Thử lại" onPress={restore} />
+          </>
+        ) : (
+          <ActivityIndicator
+            accessibilityLabel="Đang khôi phục phiên đăng nhập"
+            size="large"
+            color={colors.primary}
+          />
+        )}
+      </View>
+    );
   return (
     <Stack.Navigator
       screenOptions={{
@@ -53,3 +76,13 @@ export function RootNavigator() {
     </Stack.Navigator>
   );
 }
+
+const styles = StyleSheet.create({
+  loading: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+    gap: 16,
+  },
+});

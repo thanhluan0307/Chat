@@ -186,3 +186,40 @@ test("database failures return a generic error", async (t) => {
   assert.equal(res.code, 500);
   assert.deepEqual(res.body, { message: "Lỗi hệ thống" });
 });
+
+test("search filters names and usernames before both pagination and count", async (t) => {
+  const calls = database(t, [publicUser], 3);
+  const res = response();
+  await getUsers(request({ search: "  LINH  ", page: "2", limit: "2" }), res);
+  assert.equal(res.code, 200);
+  assert.deepEqual(calls.filter, {
+    _id: { $ne: "current-user" },
+    $or: [
+      { displayName: { $regex: "LINH", $options: "i" } },
+      { username: { $regex: "LINH", $options: "i" } },
+    ],
+  });
+  assert.deepEqual(calls.countFilter, calls.filter);
+  assert.equal(calls.skip, 2);
+  assert.equal(res.body.pagination.total, 3);
+});
+
+test("search escapes regex metacharacters and whitespace means no filter", async (t) => {
+  const calls = database(t);
+  await getUsers(request({ search: "a.*[b]" }), response());
+  const pattern = calls.filter.$or[0].displayName.$regex;
+  assert.equal(new RegExp(pattern, "i").test("A.*[B]"), true);
+  assert.equal(new RegExp(pattern, "i").test("aaaaab"), false);
+  await getUsers(request({ search: "   " }), response());
+  assert.deepEqual(calls.filter, { _id: { $ne: "current-user" } });
+});
+
+test("non-string and oversized searches are rejected without querying", async (t) => {
+  database(t);
+  for (const search of [["linh"], { $ne: "" }, "a".repeat(101)]) {
+    const res = response();
+    await getUsers(request({ search }), res);
+    assert.equal(res.code, 400);
+  }
+  assert.equal(User.find.mock.callCount(), 0);
+});

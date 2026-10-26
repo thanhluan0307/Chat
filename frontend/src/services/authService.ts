@@ -6,7 +6,7 @@ import { getMe } from '../api/users';
 export async function authenticate(
   values: SignInRequest,
 ): Promise<AuthSession> {
-  const { accessToken } = await signIn(values);
+  const { accessToken, refreshToken } = await signIn(values);
   const user = await getMe(accessToken);
-  return { accessToken, user };
+  return { accessToken, refreshToken, user };
 }

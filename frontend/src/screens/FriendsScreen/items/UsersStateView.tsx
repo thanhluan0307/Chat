@@ -6,9 +6,15 @@ import { UsersRound } from '../../../components/icons';
 interface UsersStateViewProps {
   kind: 'loading' | 'error' | 'empty';
   error?: string | null;
+  searching?: boolean;
   onRetry?: () => void;
 }
-export function UsersStateView({ kind, error, onRetry }: UsersStateViewProps) {
+export function UsersStateView({
+  kind,
+  error,
+  onRetry,
+  searching,
+}: UsersStateViewProps) {
   const { colors } = useTheme();
   return (
     <View style={styles.container}>
@@ -26,6 +32,8 @@ export function UsersStateView({ kind, error, onRetry }: UsersStateViewProps) {
           ? 'Đang tải người dùng...'
           : kind === 'error'
           ? 'Không tải được người dùng'
+          : searching
+          ? 'Không tìm thấy người dùng'
           : 'Chưa có người dùng khác'}
       </Text>
       {kind !== 'loading' ? (
@@ -35,6 +43,8 @@ export function UsersStateView({ kind, error, onRetry }: UsersStateViewProps) {
         >
           {kind === 'error'
             ? error
+            : searching
+            ? 'Hãy thử tên hoặc username khác.'
             : 'Những người tham gia ChatApp sẽ xuất hiện tại đây.'}
         </Text>
       ) : null}

@@ -36,7 +36,8 @@ RootStack
     └── Conversation                ngoài bottom tab
 ```
 
-App luôn mở ở màn Đăng nhập, bắt buộc nhập **Tên đăng nhập** và **Mật khẩu**.
+App khôi phục phiên đã lưu khi mở lại. Nếu chưa có phiên hoặc refresh token đã hết hạn,
+app yêu cầu **Tên đăng nhập** và **Mật khẩu**.
 Chỉ mở 3 tab khi `POST /api/auth/signin` trả access token hợp lệ và
 `GET /api/users/me` xác nhận được tài khoản. Không có đường vào bằng tài khoản khách.
 Nhấn **Đăng ký ngay** để tạo tài khoản với họ, tên, username, email và mật khẩu.
@@ -47,9 +48,17 @@ Màn Chi tiết cuộc trò chuyện nằm ngoài bottom tab. Quay lại sẽ tr
 trước đó. **Đăng xuất** ở Cá nhân quay về màn Đăng nhập
 và loại bỏ lịch sử của phiên đăng nhập.
 
-Đăng nhập, lấy hồ sơ và yêu cầu đăng xuất đã nối với API backend hiện có. Token chỉ
-giữ trong bộ nhớ: đóng và mở lại ứng dụng sẽ yêu cầu đăng nhập lại. Chưa tự refresh
-token. Đăng xuất luôn xóa phiên trên máy, kể cả khi máy chủ không phản hồi.
+Phiên (access token, refresh token và hồ sơ; không lưu mật khẩu) được lưu trong
+MMKV mã hóa AES-256. Khóa mã hóa ngẫu nhiên giữ trong iOS Keychain/Android Keystore
+qua `react-native-keychain`. Trạng thái phiên khi app chạy vẫn do React Hook Form quản lý.
+Axios tự gọi `POST /api/auth/refresh` khi request được xác thực nhận 401/403, chia sẻ
+một lần refresh giữa các request đồng thời rồi thử lại mỗi request tối đa một lần.
+Backend cấp refresh token cho native client với `client: "mobile"`; thời hạn hiện tại
+là 14 ngày, sau đó cần đăng nhập lại. Mất mạng không xóa phiên đã lưu.
+Đăng xuất xóa MMKV trước khi gọi server thu hồi refresh token; phản hồi refresh cũ
+không thể khôi phục phiên vừa đăng xuất. Lỗi đọc/xóa bộ nhớ có thông báo thử lại.
+Sau khi cài thư viện native, chạy lại `bundle exec pod install` trong `ios` nếu cần
+và build lại app bằng `npm run ios` hoặc `npm run android`; reload Metro chưa đủ.
 Màn Chat lấy danh sách thật qua `GET /api/conversations`, có loading, lỗi/thử lại,
 kéo để làm mới và tải lại khi tab được focus. Danh sách rỗng hiển thị view
 **Chưa có cuộc trò chuyện**; tìm kiếm không khớp hiển thị trạng thái riêng.
@@ -57,6 +66,10 @@ Tab Bạn bè hiển thị thư mục người dùng thật qua `GET /api/users?
 Cuộn cuối danh sách hoặc nhấn **Tải thêm** để lấy trang tiếp theo. Kéo để làm mới
 sẽ tải lại trang một; lỗi trang sau giữ các dòng đã tải và cho thử lại cùng trang.
 Danh sách loại tài khoản hiện tại và hiển thị tên, username của người dùng khác.
+Ô **Tìm bạn** dùng RHF, chờ 300 ms hoặc nhấn Search để gửi `search` lên API.
+Backend tìm một phần tên/username không phân biệt hoa thường, trước khi phân trang;
+không tự bỏ dấu tiếng Việt. Đổi từ khóa tải lại trang một, hủy request cũ, xóa từ khóa
+trở về danh sách đầy đủ; không khớp hiển thị **Không tìm thấy người dùng**.
 Lịch sử tin nhắn trong màn Chi tiết vẫn là phần mẫu, chưa nối Socket.IO.
 
 Các state của base dùng React Hook Form: session trong `SessionProvider`,

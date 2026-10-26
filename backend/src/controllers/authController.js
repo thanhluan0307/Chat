@@ -8,6 +8,16 @@ import Session from "../models/Session.js";
 const ACCESS_TOKEN_TTL = "30m"; // thuờng là dưới 15m
 const REFRESH_TOKEN_TTL = 14 * 24 * 60 * 60 * 1000; // 14 ngày
 
+// Native clients store refresh tokens securely; browsers continue using HttpOnly cookies.
+function readRefreshToken(req) {
+  const token = req.body?.client === "mobile"
+    ? req.body.refreshToken
+    : req.cookies?.refreshToken;
+  return typeof token === "string" && token.length > 0 && token.length <= 512
+    ? token
+    : undefined;
+}
+
 export const signUp = async (req, res) => {
   try {
     const { username, password, email, firstName, lastName } = req.body;
@@ -89,18 +99,23 @@ export const signIn = async (req, res) => {
       expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL),
     });
 
-    // trả refresh token về trong cookie
-    res.cookie("refreshToken", refreshToken, {
-      httpOnly: true,
-      secure: true,
-      sameSite: "none", //backend, frontend deploy riêng
-      maxAge: REFRESH_TOKEN_TTL,
-    });
+    // Browser dùng cookie; mobile nhận token trong JSON để lưu vào bộ nhớ bảo mật.
+    if (req.body.client !== "mobile") {
+      res.cookie("refreshToken", refreshToken, {
+        httpOnly: true,
+        secure: true,
+        sameSite: "none", //backend, frontend deploy riêng
+        maxAge: REFRESH_TOKEN_TTL,
+      });
+    }
 
     // trả access token về trong res
     return res
       .status(200)
-      .json({ message: `User ${user.displayName} đã logged in!`, accessToken });
+      .json({
+        message: `User ${user.displayName} đã logged in!`, accessToken,
+        ...(req.body.client === "mobile" ? { refreshToken } : {}),
+      });
   } catch (error) {
     console.error("Lỗi khi gọi signIn", error);
     return res.status(500).json({ message: "Lỗi hệ thống" });
@@ -109,15 +124,16 @@ export const signIn = async (req, res) => {
 
 export const signOut = async (req, res) => {
   try {
-    // lấy refresh token từ cookie
-    const token = req.cookies?.refreshToken;
+    // Mobile gửi token trong body; browser gửi cookie.
+    const token = readRefreshToken(req);
 
     if (token) {
       // xoá refresh token trong Session
       await Session.deleteOne({ refreshToken: token });
 
       // xoá cookie
-      res.clearCookie("refreshToken");
+      if (req.body?.client !== "mobile")
+        res.clearCookie("refreshToken", { httpOnly: true, secure: true, sameSite: "none" });
     }
 
     return res.sendStatus(204);
@@ -130,8 +146,8 @@ export const signOut = async (req, res) => {
 // tạo access token mới từ refresh token
 export const refreshToken = async (req, res) => {
   try {
-    // lấy refresh token từ cookie
-    const token = req.cookies?.refreshToken;
+    // Mobile gửi token trong body; browser gửi cookie.
+    const token = readRefreshToken(req);
     if (!token) {
       return res.status(401).json({ message: "Token không tồn tại." });
     }

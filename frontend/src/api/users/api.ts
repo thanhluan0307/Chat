@@ -47,11 +47,15 @@ function isPagination(value: unknown): value is UsersPagination {
 
 /** Fetch one validated page of the public user directory with the active session token. */
 export async function getUsers(
-  { page = 1, limit = 20 }: GetUsersParams = {},
+  { page = 1, limit = 20, search }: GetUsersParams = {},
   signal?: AbortSignal,
 ): Promise<UsersPage> {
   const { data } = await httpClient.get<unknown>(API_ENDPOINTS.users.list, {
-    params: { page, limit },
+    params: {
+      page,
+      limit,
+      ...(search?.trim() ? { search: search.trim() } : {}),
+    },
     signal,
   });
   if (

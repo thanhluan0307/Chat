@@ -7,7 +7,7 @@ import { useSession } from '../../providers/SessionProvider';
 
 export function ProfileScreen() {
   const { colors } = useTheme();
-  const { session, signOut, isSigningOut } = useSession();
+  const { session, signOut, isSigningOut, signOutError } = useSession();
   return (
     <Screen>
       <ScrollView contentContainerStyle={styles.content}>
@@ -28,6 +28,14 @@ export function ProfileScreen() {
             Trò chuyện, tìm bạn và tận hưởng những kết nối mỗi ngày.
           </Text>
         </View>
+        {signOutError ? (
+          <Text
+            accessibilityRole="alert"
+            style={{ color: colors.notification }}
+          >
+            {signOutError}
+          </Text>
+        ) : null}
         <AppButton
           title="Đăng xuất"
           onPress={signOut}
