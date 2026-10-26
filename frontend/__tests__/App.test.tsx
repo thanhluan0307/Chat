@@ -18,6 +18,17 @@ function allowLogin() {
     .onPost('/auth/signin')
     .replyOnce(200, { accessToken: 'test-access-token' });
   apiMock.onGet('/users/me').replyOnce(200, { user });
+  apiMock.onGet('/users').reply(200, {
+    users: [{ _id: 'friend-1', displayName: 'Linh Nguyễn', username: 'linh' }],
+    pagination: {
+      page: 1,
+      limit: 20,
+      total: 1,
+      totalPages: 1,
+      hasNextPage: false,
+      hasPreviousPage: false,
+    },
+  });
   apiMock.onGet('/conversations').reply(200, {
     conversations: [
       {
@@ -129,10 +140,9 @@ test('verified login opens tabs, preserves selected tabs, and manages drafts wit
   ).toBeOnTheScreen();
   await fireEvent.changeText(screen.getByLabelText('Tìm cuộc trò chuyện'), '');
   await fireEvent.press(screen.getByTestId('tab-friends'));
-  await fireEvent.press(
-    await screen.findByRole('button', {
-      name: 'Mở trò chuyện với Linh Nguyễn',
-    }),
+  await screen.findByText('Mọi người');
+  await act(() =>
+    navigationRef.navigate(RouteName.Conversation, { conversationId: 'linh' }),
   );
   expect(navigationRef.getCurrentRoute()?.name).toBe(RouteName.Conversation);
   expect(screen.queryByTestId('tab-friends')).toBeNull();
@@ -145,7 +155,7 @@ test('verified login opens tabs, preserves selected tabs, and manages drafts wit
   expect(screen.getByText('Chào bạn!')).toBeOnTheScreen();
   expect(screen.getByLabelText('Nội dung tin nhắn')).toHaveProp('value', '');
   await act(() => navigationRef.goBack());
-  expect(await screen.findByText('Bạn bè của bạn')).toBeOnTheScreen();
+  expect(await screen.findByText('Mọi người')).toBeOnTheScreen();
 });
 
 test('sign-out clears the authenticated session, request token, and navigation history', async () => {

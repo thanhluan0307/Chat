@@ -52,6 +52,17 @@ beforeEach(() => {
     .onPost('/auth/signin')
     .replyOnce(200, { accessToken: 'test-access-token' });
   apiMock.onGet('/users/me').replyOnce(200, { user });
+  apiMock.onGet('/users').reply(200, {
+    users: [],
+    pagination: {
+      page: 1,
+      limit: 20,
+      total: 0,
+      totalPages: 0,
+      hasNextPage: false,
+      hasPreviousPage: false,
+    },
+  });
 });
 afterAll(() => apiMock.restore());
 

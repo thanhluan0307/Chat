@@ -5,6 +5,7 @@ export const API_ENDPOINTS = {
     signIn: '/auth/signin',
   },
   users: {
+    list: '/users',
     me: '/users/me',
   },
   conversations: {

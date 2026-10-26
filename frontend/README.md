@@ -43,8 +43,8 @@ Nhấn **Đăng ký ngay** để tạo tài khoản với họ, tên, username, 
 Form kiểm tra email, mật khẩu tối thiểu 8 ký tự và xác nhận mật khẩu trùng khớp.
 Đăng ký gọi `POST /api/auth/signup`; thành công quay lại Đăng nhập và điền sẵn
 username. Mật khẩu không được đưa vào route hoặc giữ lại trên màn Đăng nhập.
-Chọn một người ở tab Chat hoặc Bạn bè để mở cuộc trò chuyện không có bottom tab.
-Quay lại sẽ trở về đúng tab trước đó. **Đăng xuất** ở Cá nhân quay về màn Đăng nhập
+Màn Chi tiết cuộc trò chuyện nằm ngoài bottom tab. Quay lại sẽ trở về đúng tab
+trước đó. **Đăng xuất** ở Cá nhân quay về màn Đăng nhập
 và loại bỏ lịch sử của phiên đăng nhập.
 
 Đăng nhập, lấy hồ sơ và yêu cầu đăng xuất đã nối với API backend hiện có. Token chỉ
@@ -53,11 +53,16 @@ token. Đăng xuất luôn xóa phiên trên máy, kể cả khi máy chủ khô
 Màn Chat lấy danh sách thật qua `GET /api/conversations`, có loading, lỗi/thử lại,
 kéo để làm mới và tải lại khi tab được focus. Danh sách rỗng hiển thị view
 **Chưa có cuộc trò chuyện**; tìm kiếm không khớp hiển thị trạng thái riêng.
-Danh bạ và lịch sử tin nhắn trong màn Chi tiết vẫn là phần mẫu, chưa nối Socket.IO.
+Tab Bạn bè hiển thị thư mục người dùng thật qua `GET /api/users?page=1&limit=20`.
+Cuộn cuối danh sách hoặc nhấn **Tải thêm** để lấy trang tiếp theo. Kéo để làm mới
+sẽ tải lại trang một; lỗi trang sau giữ các dòng đã tải và cho thử lại cùng trang.
+Danh sách loại tài khoản hiện tại và hiển thị tên, username của người dùng khác.
+Lịch sử tin nhắn trong màn Chi tiết vẫn là phần mẫu, chưa nối Socket.IO.
 
 Các state của base dùng React Hook Form: session trong `SessionProvider`,
 username/password/validation/submitting/error trong `useLoginForm`, tìm kiếm và trạng thái tải danh sách ở `useChats`,
 đăng ký và xác nhận mật khẩu trong `useRegisterForm`,
+người dùng/phân trang/trạng thái tải trong `useUsers`,
 và draft/danh sách tin nhắn ở Chi tiết. `useWatch` đọc giá trị cần render;
 `getValues` chỉ dùng trong handler. `FormTextInput` nối TextInput với `useController`.
 
@@ -115,8 +120,8 @@ src/api/
 │   ├── types.ts      Kiểu danh sách trả về từ backend
 │   └── index.ts
 └── users/
-    ├── api.ts        getMe
-    ├── types.ts      UserProfile
+    ├── api.ts        getMe, getUsers
+    ├── types.ts      UserProfile, UserSummary và phân trang
     └── index.ts
 ```
 
@@ -134,7 +139,7 @@ API từng domain chỉ chứa endpoint, payload và kiểm tra dữ liệu tr�
 cho provider. Screen không tự tạo Axios instance hoặc gọi HTTP trực tiếp.
 
 Khai báo đường dẫn tại `api/endpoints.ts` và dùng `API_ENDPOINTS.auth.signIn`,
-`API_ENDPOINTS.auth.signUp`, `API_ENDPOINTS.auth.signOut`, `API_ENDPOINTS.users.me`,
+`API_ENDPOINTS.auth.signUp`, `API_ENDPOINTS.auth.signOut`, `API_ENDPOINTS.users.me`, `API_ENDPOINTS.users.list`,
 `API_ENDPOINTS.conversations.list`
 trong các hàm gọi API.
 
@@ -169,3 +174,6 @@ Test HTTP client kiểm tra token thay đổi/xóa, header tường minh, lỗi 
 timeout, JSON không hợp lệ và hủy request.
 Test danh sách Chat kiểm tra loading, dữ liệu rỗng, tên đối phương/nhóm, số chưa đọc
 của chính người dùng, lọc tìm kiếm, lỗi/thử lại và bỏ qua phản hồi của request cũ.
+Test thư mục người dùng kiểm tra query phân trang/token, dữ liệu rỗng, nối trang
+không trùng ID, hết dữ liệu, tải lại trang lỗi, chặn request đồng thời và refresh
+trong lúc đang tải trang tiếp theo. Backend có bộ test riêng bằng `cd backend && npm test`.
