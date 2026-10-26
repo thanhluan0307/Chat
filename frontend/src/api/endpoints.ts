@@ -12,4 +12,11 @@ export const API_ENDPOINTS = {
   conversations: {
     list: '/conversations',
   },
+  friends: {
+    requests: '/friends/requests',
+    acceptRequest: (id: string) =>
+      `/friends/requests/${encodeURIComponent(id)}/accept`,
+    declineRequest: (id: string) =>
+      `/friends/requests/${encodeURIComponent(id)}/decline`,
+  },
 } as const;

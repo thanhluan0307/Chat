@@ -5,11 +5,14 @@ export interface UserProfile {
   email: string;
 }
 
+export type FriendshipStatus = 'none' | 'friends' | 'sent' | 'received';
+
 export interface UserSummary {
   _id: string;
   username: string;
   displayName: string;
   avatarUrl?: string | null;
+  friendshipStatus?: FriendshipStatus;
 }
 export interface UsersPagination {
   page: number;

@@ -1,5 +1,47 @@
 import { uploadImageFromBuffer } from "../middlewares/uploadMiddleware.js";
 import User from "../models/User.js";
+import Friend from "../models/Friend.js";
+import FriendRequest from "../models/FriendRequest.js";
+
+async function getFriendshipStatuses(userId, users) {
+  const statuses = new Map();
+  if (!users.length) return statuses;
+  const ids = users.map((user) => user._id);
+  const [friendships, requests] = await Promise.all([
+    Friend.find({
+      $or: [
+        { userA: userId, userB: { $in: ids } },
+        { userB: userId, userA: { $in: ids } },
+      ],
+    })
+      .select("userA userB")
+      .lean(),
+    FriendRequest.find({
+      $or: [
+        { from: userId, to: { $in: ids } },
+        { to: userId, from: { $in: ids } },
+      ],
+    })
+      .select("from to")
+      .lean(),
+  ]);
+  const currentId = userId.toString();
+  for (const request of requests) {
+    const incoming = request.to.toString() === currentId;
+    const otherId = (incoming ? request.from : request.to).toString();
+    if (incoming || !statuses.has(otherId))
+      statuses.set(otherId, incoming ? "received" : "sent");
+  }
+  for (const friendship of friendships) {
+    const otherId = (
+      friendship.userA.toString() === currentId
+        ? friendship.userB
+        : friendship.userA
+    ).toString();
+    statuses.set(otherId, "friends");
+  }
+  return statuses;
+}
 
 function parsePositiveInteger(value, fallback) {
   if (value === undefined) return fallback;
@@ -11,8 +53,13 @@ function parsePositiveInteger(value, fallback) {
 /** Return a paginated public directory of other users for the authenticated client. */
 export const getUsers = async (req, res) => {
   const search = req.query.search;
-  if (search !== undefined && (typeof search !== "string" || search.length > 100)) {
-    return res.status(400).json({ message: "search phải là chuỗi tối đa 100 ký tự." });
+  if (
+    search !== undefined &&
+    (typeof search !== "string" || search.length > 100)
+  ) {
+    return res
+      .status(400)
+      .json({ message: "search phải là chuỗi tối đa 100 ký tự." });
   }
   const page = parsePositiveInteger(req.query.page, 1);
   const limit = parsePositiveInteger(req.query.limit, 20);
@@ -22,12 +69,10 @@ export const getUsers = async (req, res) => {
     limit > 100 ||
     !Number.isSafeInteger((page - 1) * limit)
   ) {
-    return res
-      .status(400)
-      .json({
-        message:
-          "page phải là số nguyên dương; limit phải là số nguyên từ 1 đến 100.",
-      });
+    return res.status(400).json({
+      message:
+        "page phải là số nguyên dương; limit phải là số nguyên từ 1 đến 100.",
+    });
   }
   try {
     const filter = { _id: { $ne: req.user._id } };
@@ -47,9 +92,13 @@ export const getUsers = async (req, res) => {
         .lean(),
       User.countDocuments(filter),
     ]);
+    const statuses = await getFriendshipStatuses(req.user._id, users);
     const totalPages = Math.ceil(total / limit);
     return res.status(200).json({
-      users,
+      users: users.map((user) => ({
+        ...user,
+        friendshipStatus: statuses.get(user._id.toString()) ?? "none",
+      })),
       pagination: {
         page,
         limit,

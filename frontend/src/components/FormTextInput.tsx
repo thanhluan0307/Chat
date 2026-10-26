@@ -25,6 +25,7 @@ export function FormTextInput<T extends FieldValues>({
   name,
   label,
   rules,
+  style,
   ...props
 }: FormTextInputProps<T>) {
   const { colors } = useTheme();
@@ -48,6 +49,7 @@ export function FormTextInput<T extends FieldValues>({
             color: colors.text,
             borderColor: fieldState.error ? colors.notification : colors.border,
           },
+          style,
         ]}
       />
       {fieldState.error?.message ? (

@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { getUsers } from "../src/controllers/userController.js";
 import User from "../src/models/User.js";
+import Friend from "../src/models/Friend.js";
+import FriendRequest from "../src/models/FriendRequest.js";
 import userRouter from "../src/routes/userRoute.js";
 
 const publicUser = {
@@ -27,8 +29,27 @@ function response() {
     },
   };
 }
-function database(t, users = [publicUser], total = users.length) {
+function database(
+  t,
+  users = [publicUser],
+  total = users.length,
+  { friends = [], requests = [] } = {}
+) {
   const calls = {};
+  const relationQuery = (name, rows) => (filter) => {
+    calls[name] = { filter };
+    return {
+      select(fields) {
+        calls[name].fields = fields;
+        return this;
+      },
+      lean() {
+        return Promise.resolve(rows);
+      },
+    };
+  };
+  t.mock.method(Friend, "find", relationQuery("friends", friends));
+  t.mock.method(FriendRequest, "find", relationQuery("requests", requests));
   const query = {
     select(value) {
       calls.select = value;
@@ -81,7 +102,7 @@ test("defaults exclude the current user and select only public directory fields"
   assert.equal(calls.skip, 0);
   assert.equal(calls.limit, 20);
   assert.deepEqual(res.body, {
-    users: [publicUser],
+    users: [{ ...publicUser, friendshipStatus: "none" }],
     pagination: {
       page: 1,
       limit: 20,
@@ -222,4 +243,87 @@ test("non-string and oversized searches are rejected without querying", async (t
     assert.equal(res.code, 400);
   }
   assert.equal(User.find.mock.callCount(), 0);
+});
+
+test("directory includes relationship state scoped to the current page in two queries", async (t) => {
+  const users = [
+    "friend-a",
+    "friend-b",
+    "outgoing",
+    "incoming",
+    "stranger",
+  ].map((_id) => ({ ...publicUser, _id }));
+  const ids = users.map((user) => user._id);
+  const calls = database(t, users, 50, {
+    friends: [
+      { userA: "current-user", userB: "friend-a" },
+      { userA: "friend-b", userB: "current-user" },
+    ],
+    requests: [
+      { from: "current-user", to: "outgoing" },
+      { from: "incoming", to: "current-user" },
+    ],
+  });
+  const res = response();
+  await getUsers(request({ page: "2" }), res);
+  assert.equal(res.code, 200);
+  assert.deepEqual(
+    res.body.users.map((user) => user.friendshipStatus),
+    ["friends", "friends", "sent", "received", "none"]
+  );
+  assert.deepEqual(calls.friends.filter, {
+    $or: [
+      { userA: "current-user", userB: { $in: ids } },
+      { userB: "current-user", userA: { $in: ids } },
+    ],
+  });
+  assert.deepEqual(calls.requests.filter, {
+    $or: [
+      { from: "current-user", to: { $in: ids } },
+      { to: "current-user", from: { $in: ids } },
+    ],
+  });
+  assert.equal(calls.friends.fields, "userA userB");
+  assert.equal(calls.requests.fields, "from to");
+  assert.equal(Friend.find.mock.callCount(), 1);
+  assert.equal(FriendRequest.find.mock.callCount(), 1);
+  assert.equal(res.body.pagination.total, 50);
+  assert.equal(res.body.pagination.page, 2);
+});
+
+test("friendship takes precedence over stale pending requests and incoming takes precedence over legacy opposite requests", async (t) => {
+  const users = ["friend", "pending"].map((_id) => ({ ...publicUser, _id }));
+  database(t, users, 2, {
+    friends: [{ userA: "current-user", userB: "friend" }],
+    requests: [
+      { from: "friend", to: "current-user" },
+      { from: "pending", to: "current-user" },
+      { from: "current-user", to: "pending" },
+    ],
+  });
+  const res = response();
+  await getUsers(request(), res);
+  assert.deepEqual(
+    res.body.users.map((user) => user.friendshipStatus),
+    ["friends", "received"]
+  );
+});
+
+test("an empty directory page does not query relationship collections", async (t) => {
+  database(t, [], 0);
+  await getUsers(request(), response());
+  assert.equal(Friend.find.mock.callCount(), 0);
+  assert.equal(FriendRequest.find.mock.callCount(), 0);
+});
+
+test("relationship lookup failure returns an error rather than enabling incorrect friend buttons", async (t) => {
+  database(t);
+  t.mock.method(console, "error", () => {});
+  t.mock.method(Friend, "find", () => {
+    throw new Error("private details");
+  });
+  const res = response();
+  await getUsers(request(), res);
+  assert.equal(res.code, 500);
+  assert.deepEqual(res.body, { message: "Lỗi hệ thống" });
 });

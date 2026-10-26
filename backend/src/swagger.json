@@ -64,7 +64,7 @@
                     "users": {
                       "type": "array",
                       "items": {
-                        "$ref": "#/components/schemas/PublicUser"
+                        "$ref": "#/components/schemas/DirectoryUser"
                       }
                     },
                     "pagination": {
@@ -208,52 +208,347 @@
     },
     "/friends/requests": {
       "post": {
-        "summary": "SendFriendRequest",
-        "tags": ["Friends"],
-        "responses": {},
+        "summary": "Gửi lời mời kết bạn",
+        "description": "Người gửi lấy từ access token. Chặn tự gửi, tài khoản không tồn tại, đã là bạn bè và lời mời đang chờ theo cả hai chiều. Gửi trùng đồng thời trả 409.",
+        "tags": [
+          "Friends"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
+                "required": [
+                  "to"
+                ],
                 "properties": {
                   "to": {
-                    "type": "string"
+                    "type": "string",
+                    "pattern": "^[a-fA-F0-9]{24}$",
+                    "description": "ID người nhận"
                   },
                   "message": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 300,
+                    "description": "Lời nhắn tùy chọn; bỏ khoảng trắng ở hai đầu"
+                  }
+                }
+              },
+              "example": {
+                "to": "64b000000000000000000002",
+                "message": "Chào bạn, kết bạn với mình nhé!"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Đã tạo lời mời",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "request"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "request": {
+                      "$ref": "#/components/schemas/FriendRequest"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "ID, lời nhắn không hợp lệ hoặc tự gửi cho mình"
+          },
+          "401": {
+            "description": "Chưa đăng nhập"
+          },
+          "403": {
+            "description": "Access token hết hạn hoặc không hợp lệ"
+          },
+          "404": {
+            "description": "Người nhận không tồn tại"
+          },
+          "409": {
+            "description": "Đã là bạn bè hoặc có lời mời đang chờ ở một trong hai chiều"
+          },
+          "500": {
+            "description": "Lỗi hệ thống"
+          }
+        }
+      },
+      "get": {
+        "summary": "Danh sách lời mời đã gửi và đã nhận",
+        "description": "Chỉ lấy lời mời đang chờ của tài khoản đang đăng nhập. Mới nhất trước (createdAt và _id giảm dần). sent populate người nhận (to); received populate người gửi (from). Hồ sơ là null nếu tài khoản đã xóa.",
+        "tags": [
+          "Friends"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hai danh sách có thể rỗng",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "sent",
+                    "received"
+                  ],
+                  "properties": {
+                    "sent": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "_id",
+                          "from",
+                          "to",
+                          "createdAt",
+                          "updatedAt"
+                        ],
+                        "properties": {
+                          "_id": {
+                            "type": "string"
+                          },
+                          "from": {
+                            "type": "string"
+                          },
+                          "to": {
+                            "type": "object",
+                            "nullable": true,
+                            "required": [
+                              "_id",
+                              "username",
+                              "displayName"
+                            ],
+                            "properties": {
+                              "_id": {
+                                "type": "string"
+                              },
+                              "username": {
+                                "type": "string"
+                              },
+                              "displayName": {
+                                "type": "string"
+                              },
+                              "avatarUrl": {
+                                "type": "string",
+                                "nullable": true
+                              }
+                            }
+                          },
+                          "message": {
+                            "type": "string",
+                            "maxLength": 300
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        }
+                      }
+                    },
+                    "received": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "_id",
+                          "from",
+                          "to",
+                          "createdAt",
+                          "updatedAt"
+                        ],
+                        "properties": {
+                          "_id": {
+                            "type": "string"
+                          },
+                          "from": {
+                            "type": "object",
+                            "nullable": true,
+                            "required": [
+                              "_id",
+                              "username",
+                              "displayName"
+                            ],
+                            "properties": {
+                              "_id": {
+                                "type": "string"
+                              },
+                              "username": {
+                                "type": "string"
+                              },
+                              "displayName": {
+                                "type": "string"
+                              },
+                              "avatarUrl": {
+                                "type": "string",
+                                "nullable": true
+                              }
+                            }
+                          },
+                          "to": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string",
+                            "maxLength": 300
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Chưa đăng nhập"
+          },
+          "403": {
+            "description": "Access token hết hạn hoặc không hợp lệ"
+          },
+          "500": {
+            "description": "Lỗi hệ thống"
+          }
+        }
+      }
+    },
+    "/friends/requests/{requestId}/accept": {
+      "post": {
+        "summary": "Chấp nhận lời mời kết bạn",
+        "description": "Chỉ người nhận lời mời được phép xử lý. Không cần body JSON. Tạo quan hệ bạn bè bằng upsert theo cặp ID chuẩn hóa, sau đó xóa lời mời đang chờ.",
+        "tags": [
+          "Friends"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "requestId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "ID lời mời không hợp lệ"
+          },
+          "401": {
+            "description": "Chưa đăng nhập"
+          },
+          "403": {
+            "description": "Không phải người nhận hoặc access token hết hạn"
+          },
+          "404": {
+            "description": "Không tìm thấy lời mời, đã được xử lý hoặc người gửi đã xóa tài khoản"
+          },
+          "500": {
+            "description": "Lỗi hệ thống; có thể thử lại"
+          },
+          "200": {
+            "description": "Đã kết bạn và xóa lời mời",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message",
+                    "newFriend"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "newFriend": {
+                      "$ref": "#/components/schemas/PublicUser"
+                    }
                   }
                 }
               }
             }
           }
         }
-      },
-      "get": {
-        "summary": "GetFriendRequests",
-        "tags": ["Friends"],
-        "responses": {}
       }
     },
-    "/friends/requests/68faed19defb37e90657d7d6/accept": {
+    "/friends/requests/{requestId}/decline": {
       "post": {
-        "summary": "AcceptFriendRequest",
-        "tags": ["Friends"],
-        "responses": {}
-      }
-    },
-    "/friends/requests/68fb124874f8418a6bc83ed1/decline": {
-      "post": {
-        "summary": "DeclineFriendRequest",
-        "tags": ["Friends"],
-        "responses": {},
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object"
-              }
+        "summary": "Từ chối lời mời kết bạn",
+        "description": "Chỉ người nhận lời mời được phép xử lý. Không cần body JSON. Chỉ xóa lời mời đang chờ; không tạo quan hệ bạn bè.",
+        "tags": [
+          "Friends"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "requestId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
             }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "ID lời mời không hợp lệ"
+          },
+          "401": {
+            "description": "Chưa đăng nhập"
+          },
+          "403": {
+            "description": "Không phải người nhận hoặc access token hết hạn"
+          },
+          "404": {
+            "description": "Không tìm thấy lời mời, đã được xử lý hoặc người gửi đã xóa tài khoản"
+          },
+          "500": {
+            "description": "Lỗi hệ thống; có thể thử lại"
+          },
+          "204": {
+            "description": "Đã từ chối, response không có body"
           }
         }
       }
@@ -374,6 +669,54 @@
       }
     },
     "schemas": {
+      "DirectoryUser": {
+        "allOf": [
+          { "$ref": "#/components/schemas/PublicUser" },
+          {
+            "type": "object",
+            "required": ["friendshipStatus"],
+            "properties": {
+              "friendshipStatus": {
+                "type": "string", "enum": ["none", "sent", "received", "friends"],
+                "description": "Trạng thái quan hệ với tài khoản đang đăng nhập"
+              }
+            }
+          }
+        ]
+      },
+      "FriendRequest": {
+        "type": "object",
+        "required": [
+          "_id",
+          "from",
+          "to",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "_id": {
+            "type": "string"
+          },
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "PublicUser": {
         "type": "object",
         "required": [

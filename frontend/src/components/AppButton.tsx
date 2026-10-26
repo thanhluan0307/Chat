@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native';
 
 interface AppButtonProps {
   title: string;
+  accessibilityLabel?: string;
   onPress: () => void;
   secondary?: boolean;
   disabled?: boolean;
@@ -10,6 +11,7 @@ interface AppButtonProps {
 }
 export function AppButton({
   title,
+  accessibilityLabel,
   onPress,
   secondary = false,
   disabled = false,
@@ -19,7 +21,7 @@ export function AppButton({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={title}
+      accessibilityLabel={accessibilityLabel ?? title}
       accessibilityState={{ disabled: disabled || loading, busy: loading }}
       disabled={disabled || loading}
       onPress={onPress}

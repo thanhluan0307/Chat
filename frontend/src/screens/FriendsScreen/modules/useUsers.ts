@@ -135,6 +135,20 @@ export function useUsers() {
       load(currentPagination.page + 1, 'more');
   }, [getValues, load, query]);
 
+  const markRequestSent = useCallback(
+    (userId: string) => {
+      setValue(
+        'users',
+        getValues('users').map(user =>
+          user._id === userId ? { ...user, friendshipStatus: 'sent' } : user,
+        ),
+      );
+      // Reload after the POST commits and cancel any earlier GET that could restore old status.
+      load(1, 'refresh');
+    },
+    [getValues, setValue, load],
+  );
+
   return {
     control,
     search,
@@ -152,5 +166,6 @@ export function useUsers() {
     refresh,
     retry,
     loadMore,
+    markRequestSent,
   };
 }

@@ -4,6 +4,7 @@ export const RouteName = {
   MainTabs: 'MainTabs',
   Chats: 'Chats',
   Friends: 'Friends',
+  Notifications: 'Notifications',
   Profile: 'Profile',
   Conversation: 'Conversation',
 } as const;

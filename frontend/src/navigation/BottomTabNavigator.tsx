@@ -1,8 +1,14 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useTheme } from '@react-navigation/native';
-import { MessageCircle, UserRound, UsersRound } from '../components/icons';
+import {
+  Bell,
+  MessageCircle,
+  UserRound,
+  UsersRound,
+} from '../components/icons';
 import { ChatsScreen } from '../screens/ChatsScreen';
 import { FriendsScreen } from '../screens/FriendsScreen';
+import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { RouteName } from './routes';
 import type { MainTabParamList } from './types';
@@ -31,6 +37,9 @@ function ProfileIcon({ color, size, focused }: TabIconProps) {
   return (
     <UserRound color={color} size={size} strokeWidth={focused ? 2.4 : 1.8} />
   );
+}
+function NotificationsIcon({ color, size, focused }: TabIconProps) {
+  return <Bell color={color} size={size} strokeWidth={focused ? 2.4 : 1.8} />;
 }
 export function BottomTabNavigator() {
   const { colors } = useTheme();
@@ -67,6 +76,16 @@ export function BottomTabNavigator() {
           tabBarIcon: FriendsIcon,
           tabBarButtonTestID: 'tab-friends',
           tabBarAccessibilityLabel: 'Tab Bạn bè',
+        }}
+      />
+      <Tab.Screen
+        name={RouteName.Notifications}
+        component={NotificationsScreen}
+        options={{
+          title: 'Thông báo',
+          tabBarIcon: NotificationsIcon,
+          tabBarButtonTestID: 'tab-notifications',
+          tabBarAccessibilityLabel: 'Tab Thông báo',
         }}
       />
       <Tab.Screen

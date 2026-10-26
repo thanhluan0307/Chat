@@ -18,7 +18,11 @@ function isUserSummary(value: unknown): value is UserSummary {
     Boolean(value._id) &&
     typeof value.username === 'string' &&
     typeof value.displayName === 'string' &&
-    (value.avatarUrl == null || typeof value.avatarUrl === 'string')
+    (value.avatarUrl == null || typeof value.avatarUrl === 'string') &&
+    (value.friendshipStatus === undefined ||
+      ['none', 'friends', 'sent', 'received'].some(
+        status => status === value.friendshipStatus,
+      ))
   );
 }
 function isPagination(value: unknown): value is UsersPagination {

@@ -32,13 +32,14 @@ RootStack
     ├── MainTabs
     │   ├── Chats                   Chat
     │   ├── Friends                 Bạn bè
+    │   ├── Notifications           Thông báo
     │   └── Profile                 Cá nhân
     └── Conversation                ngoài bottom tab
 ```
 
 App khôi phục phiên đã lưu khi mở lại. Nếu chưa có phiên hoặc refresh token đã hết hạn,
 app yêu cầu **Tên đăng nhập** và **Mật khẩu**.
-Chỉ mở 3 tab khi `POST /api/auth/signin` trả access token hợp lệ và
+Chỉ mở 4 tab khi `POST /api/auth/signin` trả access token hợp lệ và
 `GET /api/users/me` xác nhận được tài khoản. Không có đường vào bằng tài khoản khách.
 Nhấn **Đăng ký ngay** để tạo tài khoản với họ, tên, username, email và mật khẩu.
 Form kiểm tra email, mật khẩu tối thiểu 8 ký tự và xác nhận mật khẩu trùng khớp.
@@ -66,16 +67,38 @@ Tab Bạn bè hiển thị thư mục người dùng thật qua `GET /api/users?
 Cuộn cuối danh sách hoặc nhấn **Tải thêm** để lấy trang tiếp theo. Kéo để làm mới
 sẽ tải lại trang một; lỗi trang sau giữ các dòng đã tải và cho thử lại cùng trang.
 Danh sách loại tài khoản hiện tại và hiển thị tên, username của người dùng khác.
+Mỗi người có nút **Kết bạn** khi chưa có quan hệ. Nhấn để nhập lời nhắn tùy chọn
+(tối đa 300 ký tự) rồi **Gửi lời mời**; gửi qua `POST /api/friends/requests`.
+Form dùng RHF, có trạng thái đang gửi, chặn gửi lặp và cho thử lại khi lỗi mạng.
+Thành công hiển thị **Đã gửi**; backend trả `friendshipStatus` trong API thư mục
+để giữ trạng thái đúng khi tìm kiếm, phân trang hoặc mở lại tab/app. Người đã là bạn
+hiển thị **Bạn bè**; **Xem lời mời** dẫn tới mục **Đã nhận** của tab Thông báo.
+HTTP 409 hiển thị lỗi của server, khóa gửi lại và làm mới trạng thái quan hệ.
 Ô **Tìm bạn** dùng RHF, chờ 300 ms hoặc nhấn Search để gửi `search` lên API.
 Backend tìm một phần tên/username không phân biệt hoa thường, trước khi phân trang;
 không tự bỏ dấu tiếng Việt. Đổi từ khóa tải lại trang một, hủy request cũ, xóa từ khóa
 trở về danh sách đầy đủ; không khớp hiển thị **Không tìm thấy người dùng**.
+Tab **Thông báo** có hai mục **Đã nhận** và **Đã gửi**, kèm số lượng lời mời đang chờ.
+Dữ liệu lấy từ `GET /api/friends/requests` qua `api/friends`; người đối diện được
+chuẩn hóa từ `from`/`to`. Mỗi dòng hiển thị tên, username, lời nhắn nếu có và thời gian.
+Danh sách mới nhất trước, có loading, lỗi/thử lại, trạng thái rỗng theo từng mục và
+kéo để làm mới. Mở lại tab sẽ cập nhật cả hai danh sách; chuyển mục không gọi lại API.
+Lỗi làm mới giữ danh sách đã tải cùng nút thử lại; tài khoản đã xóa có tên thay thế.
+Trong **Đã nhận**, mỗi lời mời có **Đồng ý** và **Từ chối**, gọi POST
+`/friends/requests/:requestId/accept` hoặc `/decline` bằng ID lời mời.
+Hai nút của cùng lời mời bị khóa khi đang xử lý; các dòng khác vẫn thao tác được.
+Thành công xóa dòng, cập nhật số lượng và thông báo kết quả; lỗi giữ dòng để thử lại.
+Lời mời không còn tồn tại sẽ tải lại danh sách. API GET cũ bị hủy để không làm xuất hiện
+lại lời mời vừa xử lý. Người đã xóa tài khoản chỉ có thể được từ chối; tab **Đã gửi**
+không hiển thị các nút xử lý của người nhận. Quay lại Bạn bè sẽ tải quan hệ mới từ backend.
+
 Lịch sử tin nhắn trong màn Chi tiết vẫn là phần mẫu, chưa nối Socket.IO.
 
 Các state của base dùng React Hook Form: session trong `SessionProvider`,
 username/password/validation/submitting/error trong `useLoginForm`, tìm kiếm và trạng thái tải danh sách ở `useChats`,
 đăng ký và xác nhận mật khẩu trong `useRegisterForm`,
 người dùng/phân trang/trạng thái tải trong `useUsers`,
+lời mời/bộ lọc/trạng thái tải trong `useFriendRequests`,
 và draft/danh sách tin nhắn ở Chi tiết. `useWatch` đọc giá trị cần render;
 `getValues` chỉ dùng trong handler. `FormTextInput` nối TextInput với `useController`.
 

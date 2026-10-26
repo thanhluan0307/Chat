@@ -15,10 +15,31 @@ const friendRequestSchema = new mongoose.Schema(
     message: {
       type: String,
       maxlength: 300,
+      trim: true,
+    },
+    pairKey: {
+      type: String,
+      select: false,
     },
   },
   {
     timestamps: true,
+  }
+);
+
+friendRequestSchema.pre("validate", function () {
+  if (this.from && this.to) {
+    this.pairKey = [this.from.toString(), this.to.toString()].sort().join(":");
+  }
+});
+
+// Legacy requests have no pairKey; existing two-way lookups still find them.
+friendRequestSchema.index(
+  { pairKey: 1 },
+  {
+    name: "unique_pending_friend_pair",
+    unique: true,
+    partialFilterExpression: { pairKey: { $type: "string" } },
   }
 );
 

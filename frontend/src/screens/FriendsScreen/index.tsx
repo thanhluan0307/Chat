@@ -17,8 +17,12 @@ import { Screen } from '../../components/Screen';
 import { UserRow } from './items/UserRow';
 import { UsersStateView } from './items/UsersStateView';
 import { useUsers } from './modules/useUsers';
+import { useSendFriendRequest } from './modules/useSendFriendRequest';
+import { FriendRequestComposer } from './items/FriendRequestComposer';
+import type { TabScreenProps } from '../../navigation/types';
+import { RouteName } from '../../navigation/routes';
 
-export function FriendsScreen() {
+export function FriendsScreen({ navigation }: TabScreenProps<'Friends'>) {
   const { colors } = useTheme();
   const {
     control,
@@ -35,10 +39,22 @@ export function FriendsScreen() {
     refresh,
     retry,
     loadMore,
+    markRequestSent,
   } = useUsers();
+  const composer = useSendFriendRequest(markRequestSent, refresh);
+  const showReceived = useCallback(
+    () => navigation.navigate(RouteName.Notifications, { filter: 'received' }),
+    [navigation],
+  );
   const renderItem = useCallback<ListRenderItem<UserSummary>>(
-    ({ item }) => <UserRow user={item} />,
-    [],
+    ({ item }) => (
+      <UserRow
+        user={item}
+        onRequest={composer.open}
+        onReceived={showReceived}
+      />
+    ),
+    [composer.open, showReceived],
   );
   const footer =
     users.length > 0 ? (
@@ -134,6 +150,7 @@ export function FriendsScreen() {
           onEndReachedThreshold={0.3}
         />
       )}
+      <FriendRequestComposer {...composer} />
     </Screen>
   );
 }
