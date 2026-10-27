@@ -4,6 +4,8 @@ import { useForm, useWatch } from 'react-hook-form';
 import { getMessages, sendMessage } from '../../../api/messages';
 import type { ChatMessage } from '../../../api/messages';
 import type { RootStackParamList } from '../../../navigation/types';
+import { useSocket } from '../../../providers/SocketConnection';
+import { CHAT_EVENTS, readSocketMessage } from '../../../services/chatEvents';
 
 interface MessagesState {
   messages: ChatMessage[];
@@ -25,12 +27,13 @@ function mergeMessages(...pages: ChatMessage[][]): ChatMessage[] {
   );
 }
 
-/** Đọc lịch sử và gửi tin bằng HTTP, dùng RHF giữ draft/trạng thái; chưa xử lý sự kiện socket. */
+/** Đọc/gửi tin qua HTTP, nhận tin realtime qua socket và gộp theo ID để không trùng với HTTP ACK. */
 export function useMessages({
   conversationId,
   type,
   recipientId,
 }: RootStackParamList['Conversation']) {
+  const socket = useSocket();
   const { control, getValues, setValue } = useForm<MessagesState>({
     defaultValues: {
       messages: [],
@@ -93,13 +96,25 @@ export function useMessages({
   useFocusEffect(
     useCallback(
       function loadOnFocus() {
+        function receiveMessage(payload: unknown) {
+          const message = readSocketMessage(payload);
+          if (message?.conversationId !== conversationId) return;
+          setValue('messages', mergeMessages(getValues('messages'), [message]));
+        }
+        function syncAfterConnect() {
+          load();
+        }
+        socket?.on(CHAT_EVENTS.newMessage, receiveMessage);
+        socket?.on('connect', syncAfterConnect);
         load();
         return function cleanup() {
+          socket?.off(CHAT_EVENTS.newMessage, receiveMessage);
+          socket?.off('connect', syncAfterConnect);
           readRequest.current?.abort();
           readRequest.current = null;
         };
       },
-      [load],
+      [load, socket, conversationId, getValues, setValue],
     ),
   );
   useEffect(function manageWrite() {

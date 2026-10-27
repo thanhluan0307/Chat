@@ -102,22 +102,33 @@ signout thu hồi session và trả 204. Access token sống 30 phút, refresh t
 Trình duyệt không gửi `client: "mobile"` tiếp tục dùng cookie HttpOnly/Secure/SameSite=None;
 refresh token không xuất hiện trong JSON của browser signin. Không ghi token vào log.
 
-## Socket.IO: kết nối cơ bản
+## Chat realtime với Socket.IO
 
 Socket.IO dùng chung HTTP server/cổng với Express trong `src/socket/index.js`.
-`setupSocket(httpServer)` cấu hình server bằng function/factory, chỉ gắn xác thực JWT
-và hai sự kiện vòng đời `connection`/`disconnect`.
+`setupSocket(httpServer)` xác thực `auth.token`, kiểm tra tài khoản tồn tại rồi cho
+socket vào phòng `user:<userId>`. ID lấy từ JWT, client không có sự kiện tự join phòng.
+Nhiều thiết bị đăng nhập cùng tài khoản vào cùng phòng. Token thiếu/sai/hết hạn trả
+`connect_error` với mã `UNAUTHORIZED`.
 
-Frontend gửi access token qua `auth.token`; `socketAuthMiddleware` xác minh JWT,
-kiểm tra tài khoản còn tồn tại rồi gọi `next()` để cho kết nối đi tiếp.
-Token thiếu, sai hoặc hết hạn sẽ trả `connect_error` với mã `UNAUTHORIZED`.
+Luồng gửi vẫn qua API: `POST /api/messages/direct` hoặc `/group` kiểm tra quyền,
+lưu tin và cập nhật cuộc trò chuyện, sau đó gọi `emitNewMessage`. Hàm này phát
+`new-message` tới hợp các phòng riêng của thành viên, gồm cả người gửi, mỗi socket
+nhận một lần. Không phát toàn hệ thống. `unreadCounts` chuyển từ Map sang object
+trước khi truyền; `_id`, `conversationId`, `senderId` là chuỗi và `createdAt` là ISO.
 
-Khi đăng nhập trên app, đối chiếu log `[socket] BE nhận kết nối:` ở terminal backend
-và `[socket] FE đã kết nối BE:` ở console của app: hai bên phải có cùng socket ID.
-Khi logout, frontend chủ động disconnect và backend nhận sự kiện disconnect.
-Mỗi function chính có một khối comment tiếng Việt ngắn mô tả chức năng.
+Payload `new-message` gồm `{message, conversation, unreadCounts}`. Trong đó `message`
+gồm `_id`, `conversationId`, `senderId`, `content`, `createdAt`; `conversation` gồm
+`_id`, `lastMessage`, `lastMessageAt`. FE dùng `_id` tin để gộp với HTTP ACK.
+Tạo phòng mới phát `conversation-created` với `{conversationId}` cho các thành viên;
+mở lại phòng có sẵn không phát sự kiện tạo phòng.
+
+Tên sự kiện tập trung ở `src/socket/events.js`, tên phòng ở `src/socket/rooms.js`,
+phát tin ở `src/utils/messageHelper.js`. FE lắng nghe trong `useMessages`/`useChats`
+và tải lại dữ liệu khi reconnect. Mỗi hàm chính có một khối comment tiếng Việt ngắn.
 
 ## Kiểm tra
 
 Chạy `npm test`. Test controller và đăng ký route dùng Node test runner cùng mock
-query Mongoose; không cần mở server và không đọc/ghi cơ sở dữ liệu thật.
+query Mongoose, không đọc/ghi cơ sở dữ liệu thật. Test realtime mở Socket.IO trên
+cổng localhost tạm thời để kiểm tra nhiều thiết bị, cách ly người ngoài và reconnect;
+không dùng cổng 5001 của ứng dụng.

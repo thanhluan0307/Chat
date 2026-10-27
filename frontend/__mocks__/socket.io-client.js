@@ -1,12 +1,18 @@
 /* eslint-env jest */
 
-/** Giả lập Socket.IO để UI test điều khiển sự kiện mà không mở kết nối mạng. */
+/** Giả lập nhiều listener và gỡ từng callback như Socket.IO thật, không mở kết nối mạng. */
 const io = jest.fn(function createSocketMock() {
-  const handlers = Object.create(null);
+  const handlers = new Map();
   return {
     id: 'socket-test-id',
     on: jest.fn(function on(event, callback) {
-      handlers[event] = callback;
+      if (!handlers.has(event)) handlers.set(event, new Set());
+      handlers.get(event).add(callback);
+      return this;
+    }),
+    off: jest.fn(function off(event, callback) {
+      if (callback) handlers.get(event)?.delete(callback);
+      else handlers.delete(event);
       return this;
     }),
     connect: jest.fn(function connect() {
@@ -16,11 +22,11 @@ const io = jest.fn(function createSocketMock() {
       return this;
     }),
     removeAllListeners: jest.fn(function removeAllListeners() {
-      Object.keys(handlers).forEach(event => delete handlers[event]);
+      handlers.clear();
       return this;
     }),
     receive: function receive(event, value) {
-      handlers[event]?.(value);
+      [...(handlers.get(event) ?? [])].forEach(callback => callback(value));
     },
   };
 });

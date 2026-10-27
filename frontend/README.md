@@ -96,16 +96,17 @@ Sau khi kết bạn, nhấn **Bạn bè → Nhắn tin** hoặc **Thông báo �
 `useOpenConversation` gọi `POST /api/conversations` với `{type: "direct", memberIds: [friendId]}`;
 backend tạo phòng nếu chưa có hoặc trả lại phòng cũ. Nhận phòng hợp lệ mới mở màn Chi tiết
 bằng ID thật, tên và ID người nhận. Nút có loading, chặn bấm trùng, lỗi/thử lại và hủy
-request khi rời tab. Cuộc trò chuyện được lưu phía backend và xuất hiện trong tab Chat khi tải lại.
+request khi rời tab. Cuộc trò chuyện được lưu phía backend; tab Chat đang mở tự cập nhật khi có phòng mới.
 
 Màn Chi tiết dùng `api/messages` để tải 50 tin gần nhất qua
 `GET /api/conversations/:conversationId/messages`; chưa có phân trang tin cũ trên UI.
 Phòng trống hiển thị **Chưa có tin nhắn** và lời mời gửi lời chào. Gửi văn bản tối đa
 4000 ký tự qua `POST /api/messages/direct` hoặc `/group`, dùng RHF quản lý draft và
-trạng thái. Chỉ thêm tin/clear draft khi server xác nhận; lỗi giữ draft để gửi lại.
+trạng thái. Thêm tin khi server xác nhận qua HTTP hoặc socket, gộp theo `_id` để không trùng.
+Chỉ clear draft khi HTTP thành công; lỗi giữ draft để gửi lại.
 Backend kiểm tra quyền thành viên khi đọc lịch sử và đúng cặp người gửi/nhận khi gửi direct.
-Phần này dùng HTTP; nhận tin mới bằng cách kéo làm mới hoặc mở lại phòng.
-Socket.IO hiện vẫn chỉ quản lý kết nối, chưa có listener tin nhắn realtime ở frontend.
+Gửi tin vẫn dùng HTTP; tin nhận cập nhật ngay qua Socket.IO. Khi reconnect, màn đang mở
+tải lại 50 tin gần nhất để bù dữ liệu; kéo làm mới và mở lại phòng cũng tải từ API.
 
 Các state của base dùng React Hook Form: session trong `SessionProvider`,
 username/password/validation/submitting/error trong `useLoginForm`, tìm kiếm và trạng thái tải danh sách ở `useChats`,
@@ -235,14 +236,36 @@ không trùng ID, hết dữ liệu, tải lại trang lỗi, chặn request đ�
 trong lúc đang tải trang tiếp theo. Backend có bộ test riêng bằng `cd backend && npm test`.
 
 
-## Kết nối Socket.IO
+## Chat realtime với Socket.IO
 
-`socket.io-client` được cấu hình ở `src/services/socketService.ts` bằng function
-`connectSocket(accessToken)` và `disconnectSocket(socket)`.
-`SocketConnection` nằm trong `SessionProvider`: chờ khôi phục/đăng nhập xong mới
-kết nối, thay instance khi token đổi và dọn listener/kết nối khi logout hoặc unmount.
+`socketService.ts` có `createSocket(accessToken)`, `connectSocket(socket)` và
+`disconnectSocket(socket)`. `SocketConnection` cung cấp cùng một instance qua `useSocket()`:
+chờ khôi phục/đăng nhập xong mới kết nối, đổi instance khi token đổi, xóa listener và
+ngắt kết nối khi logout. Mỗi màn dùng `on(event, handler)` và dọn bằng `off(event, handler)`
+khi blur/unmount để không xóa listener của màn khác.
 
-`SOCKET_URL` trong `src/config/api.ts` lấy cùng host/cổng với API, bỏ phần `/api`.
-Handshake gửi JWT qua `auth.token`. Socket.IO tự thử kết nối lại khi mất mạng tạm thời.
-Kiểm tra log `[socket] FE đã kết nối BE:` và `[socket] BE nhận kết nối:`; hai bên
-phải in cùng một socket ID. Phần cấu hình này chỉ quản lý kết nối.
+`SOCKET_URL` lấy cùng host/cổng với API, bỏ `/api`. Handshake gửi JWT qua `auth.token`;
+BE tự cho socket vào `user:<userId>` từ JWT, client không tự chọn phòng.
+Các tên sự kiện ở `src/services/chatEvents.ts` khớp `backend/src/socket/events.js`.
+
+| Sự kiện | Nơi phát → nơi nghe | Xử lý |
+| --- | --- | --- |
+| `new-message` | BE → `useMessages`, `useChats` | Thêm tin đúng phòng, làm mới preview/số chưa đọc ở tab Chat đang mở. |
+| `conversation-created` | BE → `useChats` | Tải lại danh sách khi có phòng mới, gồm cả phòng chưa có tin. |
+| `connect` | Socket.IO → màn đang mở | Tải lại dữ liệu sau kết nối/reconnect. |
+
+```text
+FE gửi POST /messages/direct hoặc /group
+  → BE kiểm tra quyền, lưu Message và cập nhật Conversation
+  → BE emit('new-message') tới phòng riêng của các thành viên
+  → FE on('new-message') nhận tin và gộp theo message._id
+```
+
+Mọi thiết bị của người gửi/người nhận đều được nhận sự kiện. Payload lỗi hoặc tin của
+phòng khác bị bỏ qua ở màn Chi tiết. HTTP ACK và socket có thể đến theo thứ tự khác nhau;
+Map theo `_id` giữ mỗi tin một bản, kể cả khi GET lịch sử cũ trả về muộn.
+Frontend vẫn dùng RHF quản lý dữ liệu hiển thị; socket instance là tài nguyên kết nối dùng chung.
+
+Kiểm tra thủ công: dùng hai tài khoản đã kết bạn trên hai thiết bị/simulator, mở cùng
+cuộc trò chuyện rồi gửi tin qua lại. Tin phải xuất hiện ngay ở máy còn lại; ở tab Chat,
+preview và số chưa đọc cập nhật khi nhận sự kiện. Ngắt mạng rồi kết nối lại để kiểm tra tải bù.

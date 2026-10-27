@@ -3,7 +3,10 @@ import { httpClient } from '../http';
 import type { ChatMessage } from './types';
 
 /** Kiểm tra tin nhắn trả về trước khi đưa vào giao diện của một phòng cụ thể. */
-function parseMessage(value: unknown, conversationId: string): ChatMessage {
+export function parseMessage(
+  value: unknown,
+  conversationId: string,
+): ChatMessage {
   if (
     !value ||
     typeof value !== 'object' ||

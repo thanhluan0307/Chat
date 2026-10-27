@@ -191,3 +191,52 @@ test("sending to an authorized room stores trimmed text and derives sender from 
   assert.equal(conversation.unreadCounts.get(friend), 1);
   assert.equal(conversation.unreadCounts.get(me), 0);
 });
+
+/** Kiểm tra phòng mới thông báo cả hai phía, còn mở lại phòng cũ không phát nhầm sự kiện tạo phòng. */
+test("creating a direct room notifies both users only after saving; opening it again emits nothing", async (t) => {
+  const { createConversation } = await import(
+    "../src/controllers/conversationController.js"
+  );
+  let existing = null;
+  t.mock.method(Conversation, "findOne", async () => existing);
+  t.mock.method(Conversation.prototype, "save", async function save() {
+    return this;
+  });
+  t.mock.method(Conversation.prototype, "populate", async function populate() {
+    return this;
+  });
+  const emissions = [];
+  t.mock.method(io, "to", (rooms) => ({
+    emit(name, payload) {
+      emissions.push({ rooms, name, payload });
+    },
+  }));
+  const req = {
+    user: { _id: me },
+    body: { type: "direct", memberIds: [friend] },
+  };
+  const first = response();
+  await createConversation(req, first);
+  assert.equal(first.code, 201);
+  assert.equal(Conversation.prototype.save.mock.callCount(), 1);
+  assert.deepEqual(emissions, [
+    {
+      rooms: [`user:${me}`, `user:${friend}`],
+      name: "conversation-created",
+      payload: { conversationId: first.body.conversation._id.toString() },
+    },
+  ]);
+  existing = new Conversation({
+    ...first.body.conversation,
+    participants: [{ userId: me }, { userId: friend }],
+  });
+  const second = response();
+  await createConversation(req, second);
+  assert.equal(second.code, 201);
+  assert.equal(
+    second.body.conversation._id.toString(),
+    first.body.conversation._id.toString()
+  );
+  assert.equal(Conversation.prototype.save.mock.callCount(), 1);
+  assert.equal(emissions.length, 1);
+});

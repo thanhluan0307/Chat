@@ -7,6 +7,8 @@ import { ApiError } from '../../../api/http';
 import { useSession } from '../../../providers/SessionProvider';
 import { toChatListItem } from './Chats.helpers';
 import type { ChatListItem } from './Chats.helpers';
+import { useSocket } from '../../../providers/SocketConnection';
+import { CHAT_EVENTS, readSocketMessage } from '../../../services/chatEvents';
 
 interface ChatsFormValues {
   search: string;
@@ -16,8 +18,9 @@ interface ChatsFormValues {
   refreshing: boolean;
 }
 
-/** Fetch on focus with RHF state, cancellation and protection against stale responses. */
+/** Tải danh sách bằng RHF, cập nhật khi có tin/phòng mới hoặc reconnect và hủy request khi rời màn. */
 export function useChats() {
+  const socket = useSocket();
   const { session } = useSession();
   const userId = session?.user._id;
   const { control, getValues, setValue } = useForm<ChatsFormValues>({
@@ -78,13 +81,24 @@ export function useChats() {
 
   useFocusEffect(
     useCallback(() => {
-      // Focus reloads current data; blur/unmount aborts and invalidates the old request.
+      function syncConversations() {
+        load(true);
+      }
+      function onMessage(payload: unknown) {
+        if (readSocketMessage(payload)) syncConversations();
+      }
+      socket?.on(CHAT_EVENTS.newMessage, onMessage);
+      socket?.on(CHAT_EVENTS.conversationCreated, syncConversations);
+      socket?.on('connect', syncConversations);
       load(getValues('items').length > 0);
       return () => {
+        socket?.off(CHAT_EVENTS.newMessage, onMessage);
+        socket?.off(CHAT_EVENTS.conversationCreated, syncConversations);
+        socket?.off('connect', syncConversations);
         currentRequest.current?.abort();
         currentRequest.current = null;
       };
-    }, [getValues, load]),
+    }, [getValues, load, socket]),
   );
 
   const retry = useCallback(() => load(), [load]);

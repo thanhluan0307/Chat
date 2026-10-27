@@ -1,7 +1,10 @@
 import Conversation from "../models/Conversation.js";
 import Message from "../models/Message.js";
 import { io } from "../socket/index.js";
+import { CHAT_EVENTS } from "../socket/events.js";
+import { userRoom } from "../socket/rooms.js";
 
+/** Tạo hoặc mở lại phòng với bạn bè, thông báo realtime cho các thành viên khi có phòng mới. */
 export const createConversation = async (req, res) => {
   try {
     const { type, name, memberIds } = req.body;
@@ -20,6 +23,7 @@ export const createConversation = async (req, res) => {
     }
 
     let conversation;
+    let created = false;
 
     if (type === "direct") {
       const participantId = memberIds[0];
@@ -37,6 +41,7 @@ export const createConversation = async (req, res) => {
         });
 
         await conversation.save();
+        created = true;
       }
     }
 
@@ -52,6 +57,7 @@ export const createConversation = async (req, res) => {
       });
 
       await conversation.save();
+      created = true;
     }
 
     if (!conversation) {
@@ -76,15 +82,13 @@ export const createConversation = async (req, res) => {
 
     const formatted = { ...conversation.toObject(), participants };
 
-    if (type === "group") {
-      memberIds.forEach((userId) => {
-        io.to(userId).emit("new-group", formatted);
+    if (created) {
+      const rooms = conversation.participants
+        .filter(member => member.userId)
+        .map(member => userRoom(member.userId));
+      io.to(rooms).emit(CHAT_EVENTS.conversationCreated, {
+        conversationId: conversation._id.toString(),
       });
-    }
-
-    if (type === "direct") {
-      io.to(userId).emit("new-group", formatted);
-      io.to(memberIds[0]).emit("new-group", formatted);
     }
 
     return res.status(201).json({ conversation: formatted });

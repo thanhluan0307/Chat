@@ -8,8 +8,7 @@ export function AppProviders({ children }: PropsWithChildren) {
   return (
     <SafeAreaProvider>
       <SessionProvider>
-        <SocketConnection />
-        {children}
+        <SocketConnection>{children}</SocketConnection>
       </SessionProvider>
     </SafeAreaProvider>
   );

@@ -3,17 +3,21 @@ import type { Socket } from 'socket.io-client';
 import { SOCKET_URL } from '../config/api';
 
 /**
- * Kết nối frontend với backend bằng JWT, tự reconnect khi mất mạng
- * và ghi log vòng đời kết nối; trả instance để dọn khi kết thúc phiên.
+ * Tạo socket có JWT nhưng chưa kết nối; provider sẽ gọi connect sau khi mount.
+ * Socket.IO tự reconnect khi mất mạng, dùng cùng URL của backend.
  */
-export function connectSocket(accessToken: string): Socket | null {
+export function createSocket(accessToken: string): Socket | null {
   if (!SOCKET_URL) return null;
-  const socket = io(SOCKET_URL, {
+  return io(SOCKET_URL, {
     forceNew: true,
     autoConnect: false,
     auth: { token: accessToken },
     reconnection: true,
   });
+}
+
+/** Gắn log vòng đời và bắt đầu kết nối; được gọi lại cùng listener mới khi effect chạy lại. */
+export function connectSocket(socket: Socket): void {
   socket.on('connect', function onConnect() {
     console.info('[socket] FE đã kết nối BE:', socket.id);
   });
@@ -24,7 +28,6 @@ export function connectSocket(accessToken: string): Socket | null {
     console.info('[socket] FE chưa kết nối được BE:', error.message);
   });
   socket.connect();
-  return socket;
 }
 
 /** Ngắt kết nối và xóa listener khi đăng xuất, đổi token hoặc unmount. */
