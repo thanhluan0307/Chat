@@ -24,3 +24,6 @@ global.crypto = require('crypto').webcrypto;
 beforeEach(async () => {
   await require('./src/storage/sessionStorage').clearSession();
 });
+
+/** Mock transport cho các test kiểm tra vòng đời kết nối frontend. */
+jest.mock('socket.io-client');

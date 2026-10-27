@@ -1,29 +1,38 @@
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 
-export const socketAuthMiddleware = async (socket, next) => {
+/** Tạo lỗi xác thực thống nhất để từ chối handshake không hợp lệ. */
+function connectionError() {
+  const error = Error("Không thể xác thực kết nối socket");
+  error.data = { code: "UNAUTHORIZED" };
+  return error;
+}
+
+/**
+ * Xác minh JWT và tài khoản trong handshake, gắn người dùng vào socket.
+ * Gọi next() khi hợp lệ hoặc next(error) để từ chối kết nối.
+ */
+export async function socketAuthMiddleware(socket, next) {
   try {
     const token = socket.handshake.auth?.token;
-    if (!token) {
-      return next(new Error("Unauthorized - Token không tồn tại"));
-    }
-
-    const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
-    if (!decoded) {
-      return next(new Error("Unauthorized - Token không hợp lệ hoặc đã hết hạn"));
-    }
-
-    const user = await User.findById(decoded.userId).select("-hashedPassword");
-
-    if (!user) {
-      return next(new Error("User không tồn tại"));
-    }
-
+    if (typeof token !== "string" || !token.trim())
+      return next(connectionError());
+    const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, {
+      algorithms: ["HS256"],
+    });
+    if (
+      typeof decoded !== "object" ||
+      typeof decoded.userId !== "string" ||
+      !/^[a-f\d]{24}$/i.test(decoded.userId)
+    )
+      return next(connectionError());
+    const user = await User.findById(decoded.userId).select(
+      "_id username displayName avatarUrl"
+    );
+    if (!user) return next(connectionError());
     socket.user = user;
-
     next();
-  } catch (error) {
-    console.error("Lỗi khi verify JWT trong socketMiddleware", error);
-    next(new Error("Unauthorized"));
+  } catch {
+    next(connectionError());
   }
-};
+}

@@ -102,6 +102,21 @@ signout thu hồi session và trả 204. Access token sống 30 phút, refresh t
 Trình duyệt không gửi `client: "mobile"` tiếp tục dùng cookie HttpOnly/Secure/SameSite=None;
 refresh token không xuất hiện trong JSON của browser signin. Không ghi token vào log.
 
+## Socket.IO: kết nối cơ bản
+
+Socket.IO dùng chung HTTP server/cổng với Express trong `src/socket/index.js`.
+`setupSocket(httpServer)` cấu hình server bằng function/factory, chỉ gắn xác thực JWT
+và hai sự kiện vòng đời `connection`/`disconnect`.
+
+Frontend gửi access token qua `auth.token`; `socketAuthMiddleware` xác minh JWT,
+kiểm tra tài khoản còn tồn tại rồi gọi `next()` để cho kết nối đi tiếp.
+Token thiếu, sai hoặc hết hạn sẽ trả `connect_error` với mã `UNAUTHORIZED`.
+
+Khi đăng nhập trên app, đối chiếu log `[socket] BE nhận kết nối:` ở terminal backend
+và `[socket] FE đã kết nối BE:` ở console của app: hai bên phải có cùng socket ID.
+Khi logout, frontend chủ động disconnect và backend nhận sự kiện disconnect.
+Mỗi function chính có một khối comment tiếng Việt ngắn mô tả chức năng.
+
 ## Kiểm tra
 
 Chạy `npm test`. Test controller và đăng ký route dùng Node test runner cùng mock

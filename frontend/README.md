@@ -213,3 +213,16 @@ của chính người dùng, lọc tìm kiếm, lỗi/thử lại và bỏ qua p
 Test thư mục người dùng kiểm tra query phân trang/token, dữ liệu rỗng, nối trang
 không trùng ID, hết dữ liệu, tải lại trang lỗi, chặn request đồng thời và refresh
 trong lúc đang tải trang tiếp theo. Backend có bộ test riêng bằng `cd backend && npm test`.
+
+
+## Kết nối Socket.IO
+
+`socket.io-client` được cấu hình ở `src/services/socketService.ts` bằng function
+`connectSocket(accessToken)` và `disconnectSocket(socket)`.
+`SocketConnection` nằm trong `SessionProvider`: chờ khôi phục/đăng nhập xong mới
+kết nối, thay instance khi token đổi và dọn listener/kết nối khi logout hoặc unmount.
+
+`SOCKET_URL` trong `src/config/api.ts` lấy cùng host/cổng với API, bỏ phần `/api`.
+Handshake gửi JWT qua `auth.token`. Socket.IO tự thử kết nối lại khi mất mạng tạm thời.
+Kiểm tra log `[socket] FE đã kết nối BE:` và `[socket] BE nhận kết nối:`; hai bên
+phải in cùng một socket ID. Phần cấu hình này chỉ quản lý kết nối.

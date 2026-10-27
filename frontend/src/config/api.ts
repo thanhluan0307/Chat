@@ -1,3 +1,4 @@
+/** Cấu hình URL REST và Socket.IO theo môi trường; production cần URL HTTPS backend. */
 import { Platform, TurboModuleRegistry } from 'react-native';
 import type { TurboModule } from 'react-native';
 
@@ -18,6 +19,6 @@ const developmentHost = isLoopback
     : 'localhost'
   : metroHost;
 
-// Replace the production value with the deployed HTTPS API before releasing.
-// In development, use the Metro LAN host or the platform's emulator loopback.
 export const API_BASE_URL = __DEV__ ? `http://${developmentHost}:5001/api` : '';
+
+export const SOCKET_URL = API_BASE_URL.replace(/\/api\/?$/, '');
