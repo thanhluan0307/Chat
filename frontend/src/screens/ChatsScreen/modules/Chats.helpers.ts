@@ -7,6 +7,8 @@ export interface ChatListItem {
   avatarColor: string;
   time: string;
   unread: number;
+  type: 'direct' | 'group';
+  recipientId?: string;
 }
 
 function formatTime(value?: string | null): string {
@@ -40,6 +42,8 @@ export function toChatListItem(
     : 'Chưa có tin nhắn';
   return {
     id: conversation._id,
+    type: conversation.type,
+    recipientId: conversation.type === 'direct' ? partner?._id : undefined,
     name,
     preview,
     avatarColor: conversation.type === 'group' ? '#258E8B' : '#5979E8',

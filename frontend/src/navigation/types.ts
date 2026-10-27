@@ -17,7 +17,12 @@ export type RootStackParamList = {
   [RouteName.Login]: { registeredUsername?: string } | undefined;
   [RouteName.Register]: undefined;
   [RouteName.MainTabs]: NavigatorScreenParams<MainTabParamList> | undefined;
-  [RouteName.Conversation]: { conversationId: string };
+  [RouteName.Conversation]: {
+    conversationId: string;
+    title?: string;
+    type: 'direct' | 'group';
+    recipientId?: string;
+  };
 };
 export type RootScreenProps<T extends keyof RootStackParamList> =
   NativeStackScreenProps<RootStackParamList, T>;

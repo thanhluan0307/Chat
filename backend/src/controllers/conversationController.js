@@ -136,10 +136,36 @@ export const getConversations = async (req, res) => {
   }
 };
 
+/** Lấy lịch sử theo trang cho thành viên của phòng, kiểm tra ID và tham số trước khi truy vấn tin nhắn. */
 export const getMessages = async (req, res) => {
   try {
     const { conversationId } = req.params;
     const { limit = 50, cursor } = req.query;
+    const pageSize = Number(limit);
+    if (
+      !/^[a-f\d]{24}$/i.test(conversationId) ||
+      !Number.isInteger(pageSize) ||
+      pageSize < 1 ||
+      pageSize > 100 ||
+      (cursor !== undefined &&
+        (typeof cursor !== "string" || !Number.isFinite(Date.parse(cursor))))
+    ) {
+      return res
+        .status(400)
+        .json({ message: "Tham số lấy tin nhắn không hợp lệ" });
+    }
+    const conversation = await Conversation.findById(conversationId);
+    if (!conversation)
+      return res.status(404).json({ message: "Cuộc trò chuyện không tồn tại" });
+    if (
+      !conversation.participants.some(
+        (member) => member.userId.toString() === req.user._id.toString()
+      )
+    ) {
+      return res
+        .status(403)
+        .json({ message: "Bạn không phải thành viên cuộc trò chuyện này" });
+    }
 
     const query = { conversationId };
 
@@ -149,14 +175,13 @@ export const getMessages = async (req, res) => {
 
     let messages = await Message.find(query)
       .sort({ createdAt: -1 })
-      .limit(Number(limit) + 1);
+      .limit(pageSize + 1);
 
     let nextCursor = null;
 
-    if (messages.length > Number(limit)) {
-      const nextMessage = messages[messages.length - 1];
-      nextCursor = nextMessage.createdAt.toISOString();
+    if (messages.length > pageSize) {
       messages.pop();
+      nextCursor = messages[messages.length - 1].createdAt.toISOString();
     }
 
     messages = messages.reverse();

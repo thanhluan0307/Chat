@@ -2,7 +2,6 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '@react-navigation/native';
 import { AppButton } from '../components/AppButton';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { conversations } from '../data/conversations';
 import { useSession } from '../providers/SessionProvider';
 import { ConversationScreen } from '../screens/ConversationScreen';
 import { LoginScreen } from '../screens/LoginScreen';
@@ -52,10 +51,7 @@ export function RootNavigator() {
             name={RouteName.Conversation}
             component={ConversationScreen}
             options={({ route }) => ({
-              title:
-                conversations.find(
-                  item => item.id === route.params.conversationId,
-                )?.name ?? 'Cuộc trò chuyện',
+              title: route.params.title ?? 'Cuộc trò chuyện',
             })}
           />
         </Stack.Group>

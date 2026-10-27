@@ -9,6 +9,7 @@ import { Screen } from '../../components/Screen';
 import { FriendRequestRow } from './items/FriendRequestRow';
 import { RequestsStateView } from './items/RequestsStateView';
 import { useFriendRequests } from './modules/useFriendRequests';
+import { useOpenConversation } from '../../hooks/useOpenConversation';
 
 const filters: { key: FriendRequestFilter; label: string }[] = [
   { key: 'received', label: 'Đã nhận' },
@@ -20,6 +21,7 @@ export function NotificationsScreen({
   navigation,
 }: TabScreenProps<'Notifications'>) {
   const { colors } = useTheme();
+  const chat = useOpenConversation();
   const {
     requests,
     filter,
@@ -30,6 +32,7 @@ export function NotificationsScreen({
     actions,
     actionErrors,
     notice,
+    acceptedFriend,
     respond,
     selectFilter,
     refresh,
@@ -105,6 +108,29 @@ export function NotificationsScreen({
           {notice.text}
         </Text>
       ) : null}
+      {acceptedFriend ? (
+        <View style={styles.chatAction}>
+          <AppButton
+            title="Nhắn tin ngay"
+            accessibilityLabel={`Nhắn tin ngay với ${
+              acceptedFriend.displayName || acceptedFriend.username
+            }`}
+            onPress={() => chat.openChat(acceptedFriend)}
+            loading={!!chat.openingId}
+          />
+          {chat.error ? (
+            <>
+              <Text
+                accessibilityRole="alert"
+                style={[styles.errorText, { color: colors.notification }]}
+              >
+                {chat.error}
+              </Text>
+              <AppButton title="Thử mở lại" onPress={chat.retry} secondary />
+            </>
+          ) : null}
+        </View>
+      ) : null}
       {status === 'loading' ? (
         <RequestsStateView kind="loading" filter={filter} />
       ) : status === 'error' ? (
@@ -149,6 +175,7 @@ export function NotificationsScreen({
 
 const styles = StyleSheet.create({
   heading: { padding: 24, gap: 10 },
+  chatAction: { paddingHorizontal: 24, paddingBottom: 16, gap: 10 },
   title: { fontSize: 28, fontWeight: '700', letterSpacing: -0.7 },
   subtitle: { fontSize: 14, opacity: 0.6 },
   filters: {

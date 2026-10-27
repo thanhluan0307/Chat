@@ -35,6 +35,9 @@ export function ChatsScreen({ navigation }: TabScreenProps<'Chats'>) {
         onPress={() =>
           navigation.navigate(RouteName.Conversation, {
             conversationId: item.id,
+            title: item.name,
+            type: item.type,
+            recipientId: item.recipientId,
           })
         }
       />

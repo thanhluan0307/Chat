@@ -6,19 +6,49 @@ import {
 } from "../utils/messageHelper.js";
 import { io } from "../socket/index.js";
 
+/** Gửi tin trực tiếp bằng tài khoản từ JWT, chỉ cho phép phòng chứa đúng người gửi và người nhận. */
 export const sendDirectMessage = async (req, res) => {
   try {
-    const { recipientId, content, conversationId } = req.body;
+    const { recipientId, conversationId } = req.body;
+    const content =
+      typeof req.body.content === "string" ? req.body.content.trim() : "";
     const senderId = req.user._id;
 
     let conversation;
 
-    if (!content) {
-      return res.status(400).json({ message: "Thiếu nội dung" });
+    if (!content || content.length > 4000) {
+      return res
+        .status(400)
+        .json({ message: "Nội dung phải có từ 1 đến 4000 ký tự" });
     }
 
     if (conversationId) {
+      if (
+        typeof conversationId !== "string" ||
+        !/^[a-f\d]{24}$/i.test(conversationId)
+      ) {
+        return res
+          .status(400)
+          .json({ message: "ID cuộc trò chuyện không hợp lệ" });
+      }
       conversation = await Conversation.findById(conversationId);
+      if (!conversation)
+        return res
+          .status(404)
+          .json({ message: "Cuộc trò chuyện không tồn tại" });
+      const members = conversation.participants.map((member) =>
+        member.userId.toString()
+      );
+      if (
+        conversation.type !== "direct" ||
+        members.length !== 2 ||
+        !members.includes(senderId.toString()) ||
+        !members.includes(recipientId)
+      ) {
+        return res
+          .status(403)
+          .json({ message: "Bạn không thể gửi tin vào cuộc trò chuyện này" });
+      }
     }
 
     if (!conversation) {
@@ -52,14 +82,19 @@ export const sendDirectMessage = async (req, res) => {
   }
 };
 
+/** Gửi tin nhóm sau khi middleware xác nhận người gửi là thành viên của phòng. */
 export const sendGroupMessage = async (req, res) => {
   try {
-    const { conversationId, content } = req.body;
+    const { conversationId } = req.body;
+    const content =
+      typeof req.body.content === "string" ? req.body.content.trim() : "";
     const senderId = req.user._id;
     const conversation = req.conversation;
 
-    if (!content) {
-      return res.status(400).json("Thiếu nội dung");
+    if (!content || content.length > 4000) {
+      return res
+        .status(400)
+        .json({ message: "Nội dung phải có từ 1 đến 4000 ký tự" });
     }
 
     const message = await Message.create({

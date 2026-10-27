@@ -74,3 +74,25 @@ export async function getConversations(
   }
   return items;
 }
+
+/** Tạo hoặc mở lại direct với một người bạn, chỉ điều hướng khi nhận đúng phòng từ backend. */
+export async function createDirectConversation(
+  recipientId: string,
+  signal?: AbortSignal,
+): Promise<ConversationSummary> {
+  const { data } = await httpClient.post<unknown>(
+    API_ENDPOINTS.conversations.list,
+    { type: 'direct', memberIds: [recipientId] },
+    { signal },
+  );
+  if (
+    !isRecord(data) ||
+    !isConversation(data.conversation) ||
+    data.conversation.type !== 'direct' ||
+    data.conversation.participants.length !== 2 ||
+    !data.conversation.participants.some(person => person._id === recipientId)
+  ) {
+    throw Error('Không thể xác nhận cuộc trò chuyện. Vui lòng thử lại.');
+  }
+  return data.conversation;
+}

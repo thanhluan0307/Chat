@@ -129,6 +129,21 @@ test('network failure is visible and keeps the login form available', async () =
 
 test('verified login opens tabs, preserves selected tabs, and manages drafts with RHF', async () => {
   allowLogin();
+  apiMock
+    .onGet('/conversations/conversation-linh/messages')
+    .reply(200, { messages: [] });
+  apiMock.onPost('/messages/direct').reply(config => [
+    201,
+    {
+      message: {
+        _id: 'message-1',
+        conversationId: 'conversation-linh',
+        senderId: user._id,
+        content: JSON.parse(config.data).content,
+        createdAt: '2026-10-27T10:00:00.000Z',
+      },
+    },
+  ]);
   await render(<App />);
   await submitLogin();
   await screen.findByTestId('tab-chats');
@@ -154,17 +169,32 @@ test('verified login opens tabs, preserves selected tabs, and manages drafts wit
   await fireEvent.press(screen.getByTestId('tab-friends'));
   await screen.findByText('Mọi người');
   await act(() =>
-    navigationRef.navigate(RouteName.Conversation, { conversationId: 'linh' }),
+    navigationRef.navigate(RouteName.Conversation, {
+      conversationId: 'conversation-linh',
+      title: 'Linh Nguyễn',
+      type: 'direct',
+      recipientId: 'friend-1',
+    }),
   );
   expect(navigationRef.getCurrentRoute()?.name).toBe(RouteName.Conversation);
   expect(screen.queryByTestId('tab-friends')).toBeNull();
+  await screen.findByText('Chưa có tin nhắn');
   expect(screen.getByRole('button', { name: 'Gửi tin nhắn' })).toBeDisabled();
   await fireEvent.changeText(
     screen.getByLabelText('Nội dung tin nhắn'),
     '  Chào bạn!  ',
   );
   await fireEvent.press(screen.getByRole('button', { name: 'Gửi tin nhắn' }));
-  expect(screen.getByText('Chào bạn!')).toBeOnTheScreen();
+  expect(await screen.findByText('Chào bạn!')).toBeOnTheScreen();
+  expect(
+    JSON.parse(
+      apiMock.history.post.find(item => item.url === '/messages/direct')!.data,
+    ),
+  ).toEqual({
+    conversationId: 'conversation-linh',
+    recipientId: 'friend-1',
+    content: 'Chào bạn!',
+  });
   expect(screen.getByLabelText('Nội dung tin nhắn')).toHaveProp('value', '');
   await act(() => navigationRef.goBack());
   expect(await screen.findByText('Mọi người')).toBeOnTheScreen();

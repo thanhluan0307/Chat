@@ -72,7 +72,7 @@ Mỗi người có nút **Kết bạn** khi chưa có quan hệ. Nhấn để nh
 Form dùng RHF, có trạng thái đang gửi, chặn gửi lặp và cho thử lại khi lỗi mạng.
 Thành công hiển thị **Đã gửi**; backend trả `friendshipStatus` trong API thư mục
 để giữ trạng thái đúng khi tìm kiếm, phân trang hoặc mở lại tab/app. Người đã là bạn
-hiển thị **Bạn bè**; **Xem lời mời** dẫn tới mục **Đã nhận** của tab Thông báo.
+hiển thị nhãn **Bạn bè** và nút **Nhắn tin**; **Xem lời mời** dẫn tới mục **Đã nhận** của tab Thông báo.
 HTTP 409 hiển thị lỗi của server, khóa gửi lại và làm mới trạng thái quan hệ.
 Ô **Tìm bạn** dùng RHF, chờ 300 ms hoặc nhấn Search để gửi `search` lên API.
 Backend tìm một phần tên/username không phân biệt hoa thường, trước khi phân trang;
@@ -92,7 +92,20 @@ Lời mời không còn tồn tại sẽ tải lại danh sách. API GET cũ b�
 lại lời mời vừa xử lý. Người đã xóa tài khoản chỉ có thể được từ chối; tab **Đã gửi**
 không hiển thị các nút xử lý của người nhận. Quay lại Bạn bè sẽ tải quan hệ mới từ backend.
 
-Lịch sử tin nhắn trong màn Chi tiết vẫn là phần mẫu, chưa nối Socket.IO.
+Sau khi kết bạn, nhấn **Bạn bè → Nhắn tin** hoặc **Thông báo → Đồng ý → Nhắn tin ngay**.
+`useOpenConversation` gọi `POST /api/conversations` với `{type: "direct", memberIds: [friendId]}`;
+backend tạo phòng nếu chưa có hoặc trả lại phòng cũ. Nhận phòng hợp lệ mới mở màn Chi tiết
+bằng ID thật, tên và ID người nhận. Nút có loading, chặn bấm trùng, lỗi/thử lại và hủy
+request khi rời tab. Cuộc trò chuyện được lưu phía backend và xuất hiện trong tab Chat khi tải lại.
+
+Màn Chi tiết dùng `api/messages` để tải 50 tin gần nhất qua
+`GET /api/conversations/:conversationId/messages`; chưa có phân trang tin cũ trên UI.
+Phòng trống hiển thị **Chưa có tin nhắn** và lời mời gửi lời chào. Gửi văn bản tối đa
+4000 ký tự qua `POST /api/messages/direct` hoặc `/group`, dùng RHF quản lý draft và
+trạng thái. Chỉ thêm tin/clear draft khi server xác nhận; lỗi giữ draft để gửi lại.
+Backend kiểm tra quyền thành viên khi đọc lịch sử và đúng cặp người gửi/nhận khi gửi direct.
+Phần này dùng HTTP; nhận tin mới bằng cách kéo làm mới hoặc mở lại phòng.
+Socket.IO hiện vẫn chỉ quản lý kết nối, chưa có listener tin nhắn realtime ở frontend.
 
 Các state của base dùng React Hook Form: session trong `SessionProvider`,
 username/password/validation/submitting/error trong `useLoginForm`, tìm kiếm và trạng thái tải danh sách ở `useChats`,
@@ -109,7 +122,7 @@ src/
 ├── api/              HTTP client và API theo từng domain
 ├── config/           Địa chỉ API theo môi trường
 ├── components/       Screen, AppButton, Avatar, PersonRow
-├── data/             Dữ liệu và kiểu tin nhắn mẫu
+├── hooks/            Hook dùng chung, mở/tạo phòng trò chuyện
 ├── navigation/       AppNavigator, RootNavigator, BottomTabNavigator
 │   ├── routes.ts     Tên route tập trung
 │   ├── types.ts      Kiểu tham số route và props màn hình
@@ -128,7 +141,12 @@ Thêm tab: cập nhật `routes.ts`, `MainTabParamList`, tạo screen rồi đă
 đăng ký trong `RootNavigator`, ngang hàng với `MainTabs`.
 
 ```tsx
-navigation.navigate(RouteName.Conversation, { conversationId: 'linh' });
+navigation.navigate(RouteName.Conversation, {
+  conversationId: room._id,
+  title: friend.displayName,
+  type: 'direct',
+  recipientId: friend._id,
+});
 ```
 
 Các screen trong tab dùng `TabScreenProps`, screen bên ngoài dùng `RootScreenProps`.
@@ -152,9 +170,10 @@ src/api/
 │   ├── types.ts      Request, response và session
 │   └── index.ts
 ├── conversations/
-│   ├── api.ts        getConversations
+│   ├── api.ts        getConversations, createDirectConversation
 │   ├── types.ts      Kiểu danh sách trả về từ backend
 │   └── index.ts
+├── messages/         getMessages, sendMessage và ChatMessage
 └── users/
     ├── api.ts        getMe, getUsers
     ├── types.ts      UserProfile, UserSummary và phân trang
@@ -177,6 +196,7 @@ cho provider. Screen không tự tạo Axios instance hoặc gọi HTTP trực t
 Khai báo đường dẫn tại `api/endpoints.ts` và dùng `API_ENDPOINTS.auth.signIn`,
 `API_ENDPOINTS.auth.signUp`, `API_ENDPOINTS.auth.signOut`, `API_ENDPOINTS.users.me`, `API_ENDPOINTS.users.list`,
 `API_ENDPOINTS.conversations.list`
+`API_ENDPOINTS.conversations.messages`, `API_ENDPOINTS.messages.direct/group`
 trong các hàm gọi API.
 
 Ví dụ thêm API mới: tạo `api/friends/api.ts`, `types.ts`, `index.ts`; tái sử
@@ -202,7 +222,7 @@ npm test -- --runInBand
 ```
 
 Test tương tác dùng navigator và Axios thật, mock ở HTTP adapter: kiểm tra dữ liệu bắt buộc,
-từ chối sai mật khẩu/token, lỗi kết nối, đăng nhập, tìm kiếm, gửi tin nhắn cục bộ,
+từ chối sai mật khẩu/token, lỗi kết nối, đăng nhập, tìm kiếm, tạo/mở lại phòng, gửi tin nhắn qua HTTP,
 quay lại đúng tab và đăng xuất để xóa lịch sử điều hướng.
 Các test đăng ký kiểm tra trường bắt buộc, email, xác nhận mật khẩu, username trùng,
 payload gửi API và luồng trở về Đăng nhập sau HTTP 204; không tạo tài khoản trong DB.

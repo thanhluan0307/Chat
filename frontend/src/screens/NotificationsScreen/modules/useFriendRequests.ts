@@ -13,6 +13,7 @@ import type {
   FriendRequests,
 } from '../../../api/friends';
 import { ApiError } from '../../../api/http';
+import type { UserSummary } from '../../../api/users';
 
 interface RequestsState {
   requests: FriendRequests;
@@ -24,8 +25,10 @@ interface RequestsState {
   actions: Record<string, FriendRequestAction>;
   actionErrors: Record<string, string>;
   notice: { text: string; kind: 'success' | 'error' } | null;
+  acceptedFriend: UserSummary | null;
 }
 
+/** Tải và xử lý lời mời, giữ người vừa được đồng ý để giao diện mời mở cuộc trò chuyện. */
 export function useFriendRequests() {
   const navigation = useNavigation();
   const { control, getValues, setValue } = useForm<RequestsState>({
@@ -39,6 +42,7 @@ export function useFriendRequests() {
       actions: {},
       actionErrors: {},
       notice: null,
+      acceptedFriend: null,
     },
   });
   const [
@@ -51,6 +55,7 @@ export function useFriendRequests() {
     actions,
     actionErrors,
     notice,
+    acceptedFriend,
   ] = useWatch({
     control,
     name: [
@@ -63,6 +68,7 @@ export function useFriendRequests() {
       'actions',
       'actionErrors',
       'notice',
+      'acceptedFriend',
     ] as const,
   });
   const currentRequest = useRef<AbortController | null>(null);
@@ -148,6 +154,7 @@ export function useFriendRequests() {
       delete errors[requestId];
       setValue('actionErrors', errors);
       setValue('notice', null);
+      setValue('acceptedFriend', null);
       (async () => {
         try {
           if (action === 'accept')
@@ -174,7 +181,7 @@ export function useFriendRequests() {
                 ? `Đã kết bạn với ${name}.`
                 : `Đã từ chối lời mời từ ${name}.`,
           });
-          // Cancel any older GET and refresh after the mutation has completed.
+          setValue('acceptedFriend', action === 'accept' ? request.user : null);
           if (navigation.isFocused()) load(true);
         } catch (failure) {
           if (
@@ -220,6 +227,7 @@ export function useFriendRequests() {
     actions,
     actionErrors,
     notice,
+    acceptedFriend,
     respond,
     selectFilter,
     refresh: useCallback(() => {

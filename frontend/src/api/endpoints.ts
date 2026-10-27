@@ -11,7 +11,10 @@ export const API_ENDPOINTS = {
   },
   conversations: {
     list: '/conversations',
+    messages: (id: string) =>
+      `/conversations/${encodeURIComponent(id)}/messages`,
   },
+  messages: { direct: '/messages/direct', group: '/messages/group' },
   friends: {
     requests: '/friends/requests',
     acceptRequest: (id: string) =>

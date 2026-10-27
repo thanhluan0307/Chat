@@ -21,6 +21,7 @@ import { useSendFriendRequest } from './modules/useSendFriendRequest';
 import { FriendRequestComposer } from './items/FriendRequestComposer';
 import type { TabScreenProps } from '../../navigation/types';
 import { RouteName } from '../../navigation/routes';
+import { useOpenConversation } from '../../hooks/useOpenConversation';
 
 export function FriendsScreen({ navigation }: TabScreenProps<'Friends'>) {
   const { colors } = useTheme();
@@ -42,6 +43,7 @@ export function FriendsScreen({ navigation }: TabScreenProps<'Friends'>) {
     markRequestSent,
   } = useUsers();
   const composer = useSendFriendRequest(markRequestSent, refresh);
+  const chat = useOpenConversation();
   const showReceived = useCallback(
     () => navigation.navigate(RouteName.Notifications, { filter: 'received' }),
     [navigation],
@@ -52,9 +54,11 @@ export function FriendsScreen({ navigation }: TabScreenProps<'Friends'>) {
         user={item}
         onRequest={composer.open}
         onReceived={showReceived}
+        onChat={chat.openChat}
+        openingId={chat.openingId}
       />
     ),
-    [composer.open, showReceived],
+    [composer.open, showReceived, chat.openChat, chat.openingId],
   );
   const footer =
     users.length > 0 ? (
@@ -124,6 +128,22 @@ export function FriendsScreen({ navigation }: TabScreenProps<'Friends'>) {
           />
         </View>
       </View>
+      {chat.error ? (
+        <View style={styles.chatError}>
+          <Text
+            accessibilityRole="alert"
+            style={[styles.error, { color: colors.notification }]}
+          >
+            {chat.error}
+          </Text>
+          <AppButton
+            title="Thử mở lại"
+            onPress={chat.retry}
+            loading={!!chat.openingId}
+            secondary
+          />
+        </View>
+      ) : null}
       {status === 'loading' ? (
         <UsersStateView kind="loading" />
       ) : status === 'error' ? (
@@ -156,6 +176,7 @@ export function FriendsScreen({ navigation }: TabScreenProps<'Friends'>) {
 }
 const styles = StyleSheet.create({
   heading: { padding: 24, gap: 10 },
+  chatError: { paddingHorizontal: 20, paddingBottom: 16, gap: 10 },
   search: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -1,5 +1,11 @@
 import { useTheme } from '@react-navigation/native';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import type { UserSummary } from '../../../api/users';
 import { Avatar } from '../../../components/Avatar';
 
@@ -7,8 +13,16 @@ interface UserRowProps {
   user: UserSummary;
   onRequest: (user: UserSummary) => void;
   onReceived: () => void;
+  onChat: (user: UserSummary) => void;
+  openingId: string | null;
 }
-export function UserRow({ user, onRequest, onReceived }: UserRowProps) {
+export function UserRow({
+  user,
+  onRequest,
+  onReceived,
+  onChat,
+  openingId,
+}: UserRowProps) {
   const { colors } = useTheme();
   const name = user.displayName.trim() || user.username;
   const status = user.friendshipStatus ?? 'none';
@@ -28,6 +42,14 @@ export function UserRow({ user, onRequest, onReceived }: UserRowProps) {
         {status === 'received' ? (
           <Text style={[styles.username, { color: colors.primary }]}>
             Đã nhận lời mời
+          </Text>
+        ) : null}
+        {status === 'friends' ? (
+          <Text
+            accessibilityLabel={`Đã là bạn bè với ${name}`}
+            style={[styles.badge, { color: colors.primary }]}
+          >
+            Bạn bè
           </Text>
         ) : null}
       </View>
@@ -52,16 +74,34 @@ export function UserRow({ user, onRequest, onReceived }: UserRowProps) {
             {status === 'received' ? 'Xem lời mời' : 'Kết bạn'}
           </Text>
         </Pressable>
+      ) : status === 'friends' ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Nhắn tin với ${name}`}
+          accessibilityState={{
+            disabled: !!openingId,
+            busy: openingId === user._id,
+          }}
+          disabled={!!openingId}
+          onPress={() => onChat(user)}
+          style={[
+            styles.button,
+            { backgroundColor: colors.primary },
+            !!openingId && styles.pressed,
+          ]}
+        >
+          {openingId === user._id ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <Text style={styles.buttonLabel}>Nhắn tin</Text>
+          )}
+        </Pressable>
       ) : (
         <Text
-          accessibilityLabel={
-            status === 'friends'
-              ? `Đã là bạn bè với ${name}`
-              : `Đã gửi lời mời cho ${name}`
-          }
+          accessibilityLabel={`Đã gửi lời mời cho ${name}`}
           style={[styles.badge, { color: colors.primary }]}
         >
-          {status === 'friends' ? 'Bạn bè' : 'Đã gửi'}
+          Đã gửi
         </Text>
       )}
     </View>
